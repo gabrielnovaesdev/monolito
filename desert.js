@@ -200,8 +200,18 @@ export function createDesert(renderer, { mobile }) {
   // Corredor: duas paredes longas sobem da areia atrás do monólito, com um fio de luz no chão
   const CORR = 10;
   const wallGeo = new RoundedBoxGeometry(0.5, H, CORR, 3, 0.03);
+  // As paredes têm 10 m: a pedra precisa repetir ao longo delas (com o mapa do monólito ela esticava 12×)
+  const wallMat = stoneMat.clone();
+  wallMat.normalMap = stone.normal.clone(); wallMat.roughnessMap = stone.rough.clone();
+  wallMat.normalMap.repeat.set(CORR / 0.85, 2.6); wallMat.roughnessMap.repeat.set(CORR / 0.85, 2.6);
+  wallMat.normalMap.needsUpdate = wallMat.roughnessMap.needsUpdate = true;
+  wallMat.normalScale.set(0.35, 0.35);
+  const floorMat = wallMat.clone();
+  floorMat.normalMap = stone.normal.clone(); floorMat.roughnessMap = stone.rough.clone();
+  floorMat.normalMap.repeat.set(3.4 / 0.85, CORR / 0.85); floorMat.roughnessMap.repeat.set(3.4 / 0.85, CORR / 0.85);
+  floorMat.normalMap.needsUpdate = floorMat.roughnessMap.needsUpdate = true;
   const walls = [-1, 1].map((sd) => {
-    const w = new THREE.Mesh(wallGeo, stoneMat);
+    const w = new THREE.Mesh(wallGeo, wallMat);
     w.position.set(sd * 1.95, -H, -0.6 - CORR / 2);
     w.castShadow = w.receiveShadow = true;
     scene.add(w);
@@ -212,7 +222,7 @@ export function createDesert(renderer, { mobile }) {
   const floorLine = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.01, CORR), lineMat);
   floorLine.position.set(0, 0.2, -0.6 - CORR / 2);
   scene.add(floorLine);
-  const corrFloor = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.3, CORR), stoneMat);
+  const corrFloor = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.3, CORR), floorMat);
   corrFloor.position.set(0, 0.04, -0.6 - CORR / 2);
   corrFloor.receiveShadow = true;
   scene.add(corrFloor);

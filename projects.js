@@ -379,7 +379,7 @@ export function pavilhaoArco(renderer, { mobile }) {
   box(scene, 120, 0.7, 1.2, edge, 0, -0.25, -60.6);
 
   // Sete arcos em escala real (7 m de vão, 9 m de altura)
-  const trav = pbr('preconcrete_wall_001', { size: 1.2, color: '#fff8ee', normalScale: 0.5, aoIntensity: 0.6 }); // pedra porosa clara, no lugar do travertino
+  const trav = pbr('concrete_layers_02', { size: 2.4, color: '#ffe4c0', normalScale: 0.6, aoIntensity: 0.7 }); // estratos horizontais claros, como travertino
   const ag = archGeo(7.4, 5.6, 0.95, 1.3);
   for (let i = 0; i < 7; i++) {
     const a = new THREE.Mesh(ag, trav);
@@ -495,18 +495,31 @@ export function torreEstrato(renderer, { mobile }) {
   // Cidade: blocos instanciados com janelas acesas
   const wt = windowsTexture(8, 20, 0.4);
   const cityMat = new THREE.MeshStandardMaterial({ color: '#15171d', roughness: 0.7, emissive: '#ffffff', emissiveMap: wt, emissiveIntensity: 0.85, map: wt });
+  // Janelas em escala real: cada repetição da textura = 8 colunas × 3,2 m e 20 andares × 3,5 m, seja qual for o prédio
+  cityMat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader.replace('#include <uv_vertex>', `#include <uv_vertex>
+      vec3 isz = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
+      vec2 rep = vec2((abs(normal.x) > 0.5 ? isz.z : isz.x) / 25.6, isz.y / 70.0);
+      vMapUv *= rep; vEmissiveMapUv *= rep;`);
+  };
+  // Telhados sem janelas: laje escura com um pouco de reflexo do céu
+  const roofMat = pbr('concrete_layers_02', { size: 4, color: '#3a3b40', roughness: 0.9 });
   const NB = mobile ? 110 : 220;
-  const city = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), cityMat, NB);
+  const city = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), [cityMat, cityMat, roofMat, roofMat, cityMat, cityMat], NB);
   const mx = new THREE.Matrix4();
-  for (let i = 0, k = 0; k < NB && i < 2000; i++) {
+  // Distância até o trecho de rua por onde a câmera começa (nada pode tapar a vista para a torre)
+  const lane = (x, z) => { const t = clamp((x * 62 + z * 128) / (62 * 62 + 128 * 128)); return Math.hypot(x - 62 * t, z - 128 * t); };
+  for (let i = 0, k = 0; k < NB && i < 3000; i++) {
     const x = (Math.random() - 0.5) * 520, z = (Math.random() - 0.5) * 520;
     if (Math.hypot(x, z) < 45 || Math.abs(x % 60) < 9 || Math.abs(z % 60) < 9) continue; // ruas
     const ang = Math.atan2(z, x) * 180 / Math.PI;
     const view = ang > 25 && ang < 130 && Math.hypot(x, z) < 240; // linha de visão da câmera: só prédios baixos
     const w = 12 + Math.random() * 16, hgt = view ? 5 + Math.random() * 9 : 14 + Math.pow(Math.random(), 2) * 85;
+    if (Math.hypot(x - 62, z - 128) < 70 && lane(x, z) < w * 0.75 + 14) continue;
     mx.compose(V(x, hgt / 2, z), new THREE.Quaternion(), V(w, hgt, w * (0.7 + Math.random() * 0.6)));
     city.setMatrixAt(k++, mx);
   }
+  city.receiveShadow = true;
   scene.add(city);
 
   // Trânsito: faróis brancos e lanternas vermelhas em faixas

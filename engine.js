@@ -308,7 +308,7 @@ export function createEngine(canvas, { onHover, onIndex, onContextLost } = {}) {
 
     // Bloom e lente interpolados entre os dois mundos
     const bA = v.a.bloom, bB = v.b ? v.b.bloom : bA, m = v.mix;
-    bloom.strength = bA.strength + (bB.strength - bA.strength) * m + (v.b && m > 0 && m < 1 ? 0.25 * Math.sin(Math.PI * m) : 0);
+    bloom.strength = bA.strength + (bB.strength - bA.strength) * m + (v.b && m > 0 && m < 1 ? 0.12 * Math.sin(Math.PI * m) : 0);
     bloom.radius = bA.radius + (bB.radius - bA.radius) * m;
     bloom.threshold = bA.threshold + (bB.threshold - bA.threshold) * m;
 

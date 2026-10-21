@@ -87,3 +87,44 @@ Ver `assets/CREDITOS.md`. Resumo: 4 HDRI 2K (+4 reduções 1K locais), 7 conjunt
 - Nada do ambientCG (redirecionamento para outro domínio).
 - Aviso de compilação do ANGLE/D3D (`X3595`, derivadas em laço) vindo de um shader de terceiros (SMAA ou N8AO). Só no desktop; não é erro e não afeta a imagem.
 - Os 77 MB são baixados em segundo plano depois do hero. Em rede lenta, o projeto 1 pode não estar pronto quando a porta abre; nesse caso a porta mostra o deserto até ele chegar.
+
+## Fase 2: ciclo de melhoria
+
+Notas de 0 a 10 em cinco critérios: **L** iluminação, **M** materiais, **Mo** modelos, **V** vida, **C** acabamento de câmera.
+São avaliações visuais minhas a partir das capturas, não uma métrica automática.
+
+### Iteração 1
+
+Notas na entrada (fim da fase 1):
+
+| Cenário | L | M | Mo | V | C | Média |
+|---|---|---|---|---|---|---|
+| hero | 8 | 8 | 6 | 6 | 8 | 7,2 |
+| fresta / giro | 7,5 | 7 | 6 | 6 | 8 | 6,9 |
+| corredor | 6 | 5 | 6 | 5 | 7 | 5,8 |
+| porta de luz | 7 | 7 | 7 | 6 | 7 | 6,8 |
+| Casa Duna | 7 | 7 | 7,5 | 7 | 8 | 7,3 |
+| Capela | 7 | 7 | 7 | 7 | 8 | 7,2 |
+| Pavilhão | 8 | 6,5 | 6,5 | 7,5 | 8,5 | 7,4 |
+| Torre | 5,5 | 5 | 5 | 6 | 6 | 5,5 |
+| fenda | 5 | 7 | 7 | 6 | 7 | 6,4 |
+| contato | 8 | 8 | 6 | 6 | 8 | 7,2 |
+| **média geral** | | | | | | **6,8** |
+
+Defeitos mais visíveis:
+1. Torre, início do trajeto: um prédio sorteado ao acaso tapava a câmera (já acontecia antes); janelas esticadas conforme a altura de cada prédio e janelas acesas até nos telhados.
+2. Corredor: a pedra das paredes usava o mapa do monólito (0,85 m de largura) esticado por 10 m, criando estrias horizontais que estouravam com o sol rasante.
+3. Fenda: o véu de bloom da transição ficou mais branco com o AgX (estouro).
+4. Pavilhão: a pedra porosa dos arcos parecia esponja bege, não travertino.
+
+O que mudou:
+- Torre: nenhum prédio no corredor de visão da câmera inicial; janelas em escala real por instância (8 colunas de 3,2 m e 20 andares de 3,5 m por repetição, calculado no shader a partir da escala de cada instância); telhados com concreto escuro.
+- Corredor: material próprio para paredes e piso, com a pedra repetindo ao longo dos 10 m e normal mais suave (0,35).
+- Fenda: o reforço de bloom durante a transição caiu de 0,25 para 0,12. A máscara e o brilho âmbar da borda não mudaram.
+- Arcos: `concrete_layers_02` em tom creme, com estratos horizontais finos, mais próximo de travertino.
+
+Notas na saída: corredor 6,4 · Torre 6,6 · fenda 6,8 · Pavilhão 7,5 · demais iguais. **Média geral 7,0** (+0,2).
+
+FPS desktop (vsync desligado): hero 370 · corredor 302 · porta 204 · Duna 330/268 · Capela 284/285 · Pavilhão 246/232 · Torre 390/324 · fenda 154 · contato 355.
+Carregamento (mediana de 3): FCP 276 ms · LCP 4,2 s · TBT ≈ 1,15 s · CLS 0.
+Capturas: `relatorio/iter1/antes` e `relatorio/iter1/depois`.
