@@ -27,7 +27,7 @@ Brief para uma sessão autônoma agendada. O usuário aprovou a opção 2 em 202
 4. **Vegetação e pessoas.**
    - Modelos glTF CC0 do Poly Haven (árvores e plantas) no lugar dos icosaedros.
    - Pessoas: manter as silhuetas, mas com proporção melhor. Não usar Mixamo, porque exige login.
-5. **Edifícios.** Só se o Blender estiver instalado: procurar `where blender` e também `C:Program FilesBlender FoundationBlender */blender.exe` (o instalador não põe no PATH). Rodar headless com `blender.exe -b --python script.py`.
+5. **Edifícios.** Só se o Blender estiver instalado: procurar `where blender` e também `C:\Program Files\Blender Foundation\Blender */blender.exe` (o instalador não põe no PATH). Rodar headless com `blender.exe -b --python script.py`.
    - Modelar em Python headless: chanfros, caixilhos, mobiliário, bake de AO.
    - Exportar glTF com Draco.
    - Sem Blender, refinar em código: `RoundedBoxGeometry` nas lajes, caixilhos com perfil, peitoris e pingadeiras.
