@@ -162,7 +162,7 @@ export function createEngine(canvas, { onHover, onIndex, onContextLost } = {}) {
       p.kind = 'project';
       fitCamera(p.camera);
       await p.ready?.catch(() => {});
-      renderer.compile(p.scene, p.camera);
+      await renderer.compileAsync(p.scene, p.camera); // compila em paralelo (KHR_parallel_shader_compile), sem travar a rolagem
       projects[i] = p;
       return p;
     })());
