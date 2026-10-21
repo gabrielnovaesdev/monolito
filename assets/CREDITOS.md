@@ -24,4 +24,14 @@ Versões `_1k` de HDRI são reduções feitas localmente a partir do arquivo 2K 
 | tex/asphalt_02_* | https://polyhaven.com/a/asphalt_02 | CC0 | asfalto da Torre | 2,3 MB |
 | tex/granite_tile_03_* | https://polyhaven.com/a/granite_tile_03 | CC0 | pedras do caminho da Capela | 2,3 MB |
 | tex/forrest_ground_01_* | https://polyhaven.com/a/forrest_ground_01 | CC0 | solo sob o capim da Capela | 2,6 MB |
-| tex/dark_rock_* | https://polyhaven.com/a/dark_rock | CC0 | rochas da Casa Duna | 2,2 MB |
+
+## Modelos glTF (Poly Haven) — originais 1K baixados fora de `assets/`, reduzidos no Blender 5.2 (`blender/vegetacao.py`) e exportados em GLB com Draco
+
+| Arquivo | Origem | Licença | Redução | Tamanho |
+|---|---|---|---|---|
+| models/arvore.glb | https://polyhaven.com/a/island_tree_02 | CC0 | 1,07 M → 46,5 mil triângulos (34% das folhas, ampliadas 1,45×; texturas de tronco e galhos em 512 px) | 2,2 MB |
+| models/rocha.glb | https://polyhaven.com/a/namaqualand_boulder_04 | CC0 | 59 mil → 3 mil triângulos | 2,4 MB |
+| models/arbusto-seco.glb | https://polyhaven.com/a/wild_rooibos_bush | CC0 | variantes a–c, 23,6 mil → 9 mil triângulos | 2,1 MB |
+| models/arbusto.glb | https://polyhaven.com/a/othonna_cerarioides | CC0 | variantes b, d, f, 40 mil → 12 mil triângulos (texturas de caule em 512 px) | 0,7 MB |
+
+Decodificador Draco: `three@0.160.0/examples/jsm/libs/draco/gltf/` via cdn.jsdelivr.net (versão fixa).

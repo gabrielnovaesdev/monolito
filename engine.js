@@ -40,7 +40,7 @@ const DofShader = {
     float vz(vec2 uv) { return -perspectiveDepthToViewZ(textureLod(tDepth, uv, 0.0).x, uNear, uFar); }
     float coc(float z) { return clamp(uAperture * abs(z - uFocus) / max(z, 0.01), 0.0, uMaxBlur); }
     void main() {
-      float z = vz(vUv), c = coc(z);
+      float z = vz(vUv), c = textureLod(tDepth, vUv, 0.0).x > 0.99999 ? 0.0 : coc(z); // o céu fica nítido (estrelas não viram discos)
       vec3 acc = texture2D(tColor, vUv).rgb; float w = 1.0;
       if (c > 0.6) {
         for (int i = 0; i < 24; i++) {

@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { Water } from 'three/addons/objects/Water.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { fbm } from './textures.js';
 
 export const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -218,43 +220,89 @@ export function box(parent, w, h, d, mat, x, y, z, { cast = true, receive = true
   return m;
 }
 
-/* ---------- Pessoas (silhuetas estilizadas, escala real ~1,75 m) ---------- */
-const personMats = ['#2b2723', '#3b342d', '#7a6a58', '#d8cfc2', '#4a4f57'].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 }));
+/* ---------- Pessoas (silhuetas com proporção de ~7,5 cabeças, escala real ~1,74 m) ---------- */
+const shirts = ['#2b2723', '#6b5a48', '#d8cfc2', '#4a4f57', '#8a7a66', '#1f2a36'].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85 }));
+const pants = ['#1d1c1b', '#2e3440', '#5a5248'].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }));
+const skins = ['#8a6a52', '#c49a7a', '#5e4535'].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.65 }));
+const hair = new THREE.MeshStandardMaterial({ color: '#1b1612', roughness: 0.75 });
+const bodyGeo = { torso: new THREE.CapsuleGeometry(0.16, 0.36, 4, 12), hips: new THREE.CapsuleGeometry(0.15, 0.08, 3, 12), leg: new THREE.CapsuleGeometry(0.062, 0.76, 3, 8), arm: new THREE.CapsuleGeometry(0.043, 0.56, 3, 8), head: new THREE.SphereGeometry(0.1, 16, 12), neck: new THREE.CylinderGeometry(0.045, 0.05, 0.1, 8) };
+bodyGeo.leg.translate(0, -0.42, 0); bodyGeo.arm.translate(0, -0.3, 0);
 export function person(i = 0) {
   const g = new THREE.Group();
-  const m = personMats[i % personMats.length];
-  const skin = new THREE.MeshStandardMaterial({ color: '#8a6a52', roughness: 0.7 });
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.19, 0.62, 4, 10), m);
-  body.position.y = 1.12; body.scale.z = 0.7;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.115, 14, 10), skin);
-  head.position.y = 1.62;
-  const legs = [-1, 1].map((s) => {
-    const l = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.68, 3, 8), personMats[0]);
-    l.geometry.translate(0, -0.42, 0);
-    l.position.set(s * 0.09, 0.84, 0);
-    g.add(l);
-    return l;
-  });
-  g.add(body, head);
+  const top = shirts[i % shirts.length], low = pants[i % pants.length], skin = skins[i % skins.length];
+  const mesh = (geo, mat, x, y, z, sx = 1, sy = 1, sz = 1) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); g.add(m); return m; };
+  const torso = mesh(bodyGeo.torso, top, 0, 1.24, 0, 1.18, 1, 0.62);
+  mesh(bodyGeo.hips, low, 0, 0.98, 0, 1.08, 1, 0.66);
+  mesh(bodyGeo.neck, skin, 0, 1.53, 0);
+  const head = mesh(bodyGeo.head, skin, 0, 1.64, 0.01, 0.92, 1.12, 1);
+  mesh(bodyGeo.head, hair, 0, 1.675, -0.012, 0.96, 0.9, 0.98);
+  const legs = [-1, 1].map((sd) => mesh(bodyGeo.leg, low, sd * 0.085, 0.96, 0));
+  const arms = [-1, 1].map((sd) => { const a = mesh(bodyGeo.arm, top, sd * 0.215, 1.44, 0); a.rotation.z = sd * 0.06; return a; });
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  // Passada: as pernas balançam conforme a distância percorrida
-  g.userData.walk = (phase, amp = 0.45) => { legs[0].rotation.x = Math.sin(phase) * amp; legs[1].rotation.x = -Math.sin(phase) * amp; body.position.y = 1.12 + Math.abs(Math.cos(phase)) * 0.025; };
+  // Passada: pernas e braços em oposição, com o leve sobe e desce do corpo
+  g.userData.walk = (phase, amp = 0.45) => {
+    const k = Math.sin(phase);
+    legs[0].rotation.x = k * amp; legs[1].rotation.x = -k * amp;
+    arms[0].rotation.x = -k * amp * 0.7; arms[1].rotation.x = k * amp * 0.7;
+    const bob = Math.abs(Math.cos(phase)) * 0.022;
+    torso.position.y = 1.24 + bob; head.position.y = 1.64 + bob;
+  };
   return g;
 }
 
-/* ---------- Árvores ---------- */
-export function tree({ h = 6, r = 2.2, color = '#5f6b45', trunk = '#4a3a2c' } = {}) {
-  const g = new THREE.Group();
-  const t = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, h * 0.55, 8), new THREE.MeshStandardMaterial({ color: trunk, roughness: 0.9 }));
-  t.position.y = h * 0.275; t.castShadow = true; g.add(t);
-  const leaf = new THREE.MeshStandardMaterial({ color, roughness: 0.85, flatShading: true });
-  for (let i = 0; i < 6; i++) {
-    const c = new THREE.Mesh(new THREE.IcosahedronGeometry(r * (0.5 + Math.random() * 0.35), 1), leaf);
-    c.position.set((Math.random() - 0.5) * r, h * 0.62 + Math.random() * r * 0.7, (Math.random() - 0.5) * r);
-    c.castShadow = true; g.add(c);
-  }
-  g.userData.sway = (t, k = 1) => { g.rotation.z = Math.sin(t * 0.9 + g.position.x) * 0.012 * k; g.rotation.x = Math.cos(t * 0.7 + g.position.z) * 0.01 * k; };
-  return g;
+/* ---------- Modelos glTF (Poly Haven, CC0, reduzidos no Blender: blender/vegetacao.py) ---------- */
+const draco = new DRACOLoader().setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/gltf/');
+const gltfLoader = new GLTFLoader().setDRACOLoader(draco);
+const modelFiles = new Map();
+const loadModel = (name) => { if (!modelFiles.has(name)) modelFiles.set(name, gltfLoader.loadAsync(`assets/models/${name}.glb`)); return modelFiles.get(name); };
+// Vento compartilhado pelas folhas (o cenário ativo avança o tempo)
+export const wind = { value: 0 };
+function addWind(mat) {
+  if (mat.userData.wind) return;
+  mat.userData.wind = true;
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uWind = wind;
+    sh.vertexShader = 'uniform float uWind;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      #ifdef USE_INSTANCING
+      vec3 wp = (instanceMatrix * vec4(position, 1.0)).xyz;
+      float sway = sin(uWind * 1.6 + wp.x * 0.7 + wp.z * 0.5) * 0.5 + sin(uWind * 3.7 + wp.y * 2.0 + wp.x) * 0.25;
+      transformed.xz += vec2(sway, sway * 0.6) * 0.035 * max(position.y, 0.0);
+      #endif`);
+  };
+}
+// Espalha cópias de um modelo como InstancedMesh. `variants`: cada malha do arquivo é uma variante
+// (cada item usa uma, pela ordem); senão o modelo inteiro (todas as malhas) vai em cada item.
+// Itens: { x, z, y = 0, s = 1, r = 0, v = índice }.
+export function scatter(parent, name, items, { variants = false, shadow = true, tint, windy = false } = {}) {
+  const group = new THREE.Group();
+  parent.add(group);
+  const ready = loadModel(name).then((gltf) => {
+    const root = gltf.scene;
+    root.updateMatrixWorld(true);
+    const meshes = [];
+    root.traverse((o) => { if (o.isMesh) meshes.push(o); });
+    const box3 = new THREE.Box3(), off = new THREE.Matrix4(), m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
+    if (!variants) box3.setFromObject(root);
+    meshes.forEach((mesh, k) => {
+      const mine = variants ? items.filter((it, i) => (it.v ?? i) % meshes.length === k) : items;
+      if (!mine.length) return;
+      if (variants) box3.setFromObject(mesh);
+      // Assenta o modelo na origem: centro em x/z, base em y = 0
+      off.makeTranslation(-(box3.min.x + box3.max.x) / 2, -box3.min.y, -(box3.min.z + box3.max.z) / 2).multiply(mesh.matrixWorld);
+      const mat = tint ? mesh.material.clone() : mesh.material;
+      if (tint) mat.color.multiply(new THREE.Color(tint));
+      if (windy && /leaves|leaf/i.test(mat.name)) addWind(mat);
+      const im = new THREE.InstancedMesh(mesh.geometry, mat, mine.length);
+      mine.forEach((it, i) => {
+        m.compose(p.set(it.x, it.y ?? 0, it.z), q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, it.r ?? 0), sc.setScalar(it.s ?? 1)).multiply(off);
+        im.setMatrixAt(i, m);
+      });
+      im.castShadow = shadow; im.receiveShadow = true;
+      group.add(im);
+    });
+  }).catch((err) => console.warn('[MONÓLITO] modelo', name, err));
+  pendingLoads.push(ready);
+  return group;
 }
 
 /* ---------- Partículas soltas no ar (poeira, vagalumes, areia ao vento) ---------- */

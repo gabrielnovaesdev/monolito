@@ -1,7 +1,7 @@
 // Quatro projetos em escala real, cada um no seu lugar, na sua hora e com vida própria.
 import * as THREE from 'three';
 import { sandNormal, radialTexture, terrainNoise } from './textures.js';
-import { makeSky, envFromSky, loadHDR, envIntensity, pbr, uvScale, takeLoads, windowsTexture, waterMaterial, mirrorWater, box, person, tree, floaters, smooth, lerp, clamp } from './kit.js';
+import { makeSky, envFromSky, loadHDR, envIntensity, pbr, uvScale, takeLoads, windowsTexture, waterMaterial, mirrorWater, box, person, scatter, wind, floaters, smooth, lerp, clamp } from './kit.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const dotTex = radialTexture();
@@ -43,6 +43,7 @@ function hdri(renderer, scene, name, { mobile, sunDir, sky, bg = 1, env = 1, fog
   return loadHDR(renderer, name, { mobile, sunDir, background: !!sky }).then(({ env: e, background, horizon }) => {
     scene.environment?.dispose();
     scene.environment = e;
+    scene.userData.envK = env;
     envIntensity(scene, env);
     if (background) {
       scene.background = background; scene.backgroundIntensity = bg; sky.visible = false;
@@ -122,7 +123,6 @@ export function casaDuna(renderer, { mobile }) {
     warm: new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffbf80').multiplyScalar(3) }),
     sofa: new THREE.MeshStandardMaterial({ color: '#b9a58c', roughness: 0.9 }),
     dark: new THREE.MeshStandardMaterial({ color: '#2a2622', roughness: 0.6 }),
-    rock: pbr('dark_rock', { size: 2.4, color: '#c49a78', flatShading: true }),
   };
   const water = waterMaterial('#3f6f7c', 3);
   const h = new THREE.Group();
@@ -157,10 +157,16 @@ export function casaDuna(renderer, { mobile }) {
   // Escada lateral
   for (let i = 0; i < 9; i++) box(h, 1.6, 0.18, 0.42, M.concrete, -4.8, 0.6 + i * 0.37, -6.6 + i * 0.42);
   // Pedras e um pequeno grupo de pessoas
-  [[-14, 6, 1.4], [-11, 9, 0.8], [13, 7, 1.1], [16, -9, 1.6]].forEach(([x, z, s]) => {
-    const r = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), M.rock);
-    r.position.set(x, s * 0.4, z); r.rotation.set(Math.random(), Math.random(), 0); r.castShadow = true; scene.add(r);
-  });
+  // Rochas (glTF) afundadas na areia e arbustos secos espalhados pelas dunas
+  scatter(scene, 'rocha', [[-14, 6, 1.4], [-11, 9, 0.8], [13, 7, 1.1], [16, -9, 1.6], [-22, -14, 1.2], [24, 12, 0.7]].map(([x, z, s], i) => ({ x, z, y: -0.35 * s, s: s * 0.95, r: i * 1.9 })));
+  const shrubs = [];
+  for (let i = 0; shrubs.length < (mobile ? 22 : 48) && i < 400; i++) {
+    const a = Math.random() * Math.PI * 2, r = 11 + Math.pow(Math.random(), 0.7) * 34;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (Math.abs(x - 2) < 17 && z > -12 && z < 10) continue; // fora do deck e da casa
+    shrubs.push({ x, z, y: -0.05, s: 0.9 + Math.random() * 1.2, r: Math.random() * 6.3 });
+  }
+  scatter(scene, 'arbusto-seco', shrubs, { variants: true, tint: '#e8d2b0' });
   const standing = person(1); standing.position.set(0.5, 4, 0.6); standing.rotation.y = 0.3; h.add(standing);
   const walker = person(2); h.add(walker);
   const sitter = person(3); sitter.position.set(-9.6, 0.5, 3.1); sitter.rotation.y = Math.PI; sitter.scale.y = 0.62; h.add(sitter);
@@ -191,7 +197,7 @@ export function casaDuna(renderer, { mobile }) {
     if (!s.paused) for (let i = 0; i < a.length; i += 3) { a[i] += 0.05 * s.n; a[i + 1] += Math.sin(s.t + i) * 0.002; if (a[i] > 35) a[i] = -35; }
     wind.geometry.attributes.position.needsUpdate = true;
   }
-  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]), ao: { radius: 2, intensity: 3 }, bloom: { strength: 0.45, radius: 0.42, threshold: 1.0 } };
+  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]).then(() => envIntensity(scene, scene.userData.envK ?? 1)), ao: { radius: 2, intensity: 3 }, bloom: { strength: 0.45, radius: 0.42, threshold: 1.0 } };
 }
 
 /* =====================================================================
@@ -281,8 +287,15 @@ export function capelaFenda(renderer, { mobile }) {
     st.rotation.y = (Math.random() - 0.5) * 0.2;
   }
   box(scene, 2.6, 0.45, 0.6, cm, -5.5, 0.23, 10);
-  const t1 = tree({ h: 7, r: 2.6, color: '#2f3a28' }); t1.position.set(-13, 0, -4); scene.add(t1);
-  const t2 = tree({ h: 5, r: 2, color: '#343f2b' }); t2.position.set(15, 0, -9); scene.add(t2);
+  scatter(scene, 'arvore', [{ x: -13, z: -4, s: 2.1, r: 0.4 }, { x: 15, z: -9, s: 1.6, r: 2.2 }, { x: -24, z: -18, s: 1.9, r: 4 }], { windy: true });
+  const bushes = [];
+  for (let i = 0; bushes.length < (mobile ? 14 : 30) && i < 300; i++) {
+    const a = Math.random() * Math.PI * 2, r = 7 + Math.random() * 30;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (Math.abs(x) < 2.5 && z > 2) continue; // caminho livre
+    bushes.push({ x, z, s: 0.7 + Math.random() * 0.8, r: Math.random() * 6.3 });
+  }
+  scatter(scene, 'arbusto', bushes, { variants: true, windy: true });
   const visitor = person(0); scene.add(visitor);
 
   const flies = floaters({ count: mobile ? 70 : 160, area: 40, y: [0.3, 3], color: '#ffd98a', size: 0.16, opacity: 0.9, tex: dotTex });
@@ -316,9 +329,9 @@ export function capelaFenda(renderer, { mobile }) {
       flies.geometry.attributes.position.needsUpdate = true;
     }
     spot.intensity = 900 * (0.94 + Math.sin(s.t * 1.3) * 0.03 + Math.sin(s.t * 5.1) * 0.02);
-    t1.userData.sway(s.t); t2.userData.sway(s.t);
+    wind.value = s.t;
   }
-  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]), ao: { radius: 1.6, intensity: 2.5 }, bloom: { strength: 0.75, radius: 0.5, threshold: 0.9 } };
+  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]).then(() => envIntensity(scene, scene.userData.envK ?? 1)), ao: { radius: 1.6, intensity: 2.5 }, bloom: { strength: 0.75, radius: 0.5, threshold: 0.9 } };
 }
 
 /* =====================================================================
@@ -361,9 +374,7 @@ export function pavilhaoArco(renderer, { mobile }) {
   }
   // Bancos e árvores ao redor
   for (let i = 0; i < 4; i++) box(scene, 3.2, 0.48, 0.7, edge, (i % 2 ? 1 : -1) * 11, 0.24, 12 - i * 9);
-  const trees = [[-17, 18], [-19, 2], [-16, -14], [17, 16], [19, -2], [16, -18]].map(([x, z]) => {
-    const t = tree({ h: 7.5, r: 2.6, color: '#6f7d4b' }); t.position.set(x, 0, z); scene.add(t); return t;
-  });
+  scatter(scene, 'arvore', [[-17, 18], [-19, 2], [-16, -14], [17, 16], [19, -2], [16, -18]].map(([x, z], i) => ({ x, z, s: 2 + (i % 3) * 0.2, r: i * 1.3 })), { windy: true });
 
   // Pessoas atravessando os arcos em ritmos diferentes
   const walkers = Array.from({ length: mobile ? 5 : 9 }, (_, i) => {
@@ -409,9 +420,9 @@ export function pavilhaoArco(renderer, { mobile }) {
       b.rotation.y = -a;
       b.scale.y = 0.4 + Math.abs(Math.sin(s.t * 6 + k)) * 1.2;
     });
-    trees.forEach((t) => t.userData.sway(s.t, 0.6));
+    wind.value = s.t;
   }
-  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]), ao: { radius: 2.5, intensity: 3 }, bloom: { strength: 0.3, radius: 0.4, threshold: 1.25 } };
+  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]).then(() => envIntensity(scene, scene.userData.envK ?? 1)), ao: { radius: 2.5, intensity: 3 }, bloom: { strength: 0.3, radius: 0.4, threshold: 1.25 } };
 }
 
 /* =====================================================================
@@ -517,7 +528,7 @@ export function torreEstrato(renderer, { mobile }) {
     });
     cars.instanceMatrix.needsUpdate = true;
   }
-  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]), ao: { radius: 6, intensity: 2.5 }, bloom: { strength: 0.85, radius: 0.6, threshold: 0.85 } };
+  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]).then(() => envIntensity(scene, scene.userData.envK ?? 1)), ao: { radius: 6, intensity: 2.5 }, bloom: { strength: 0.85, radius: 0.6, threshold: 0.85 } };
 }
 
 export const PROJECTS = [casaDuna, capelaFenda, pavilhaoArco, torreEstrato];
