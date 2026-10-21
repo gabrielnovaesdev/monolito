@@ -1,7 +1,7 @@
 // Quatro projetos em escala real, cada um no seu lugar, na sua hora e com vida própria.
 import * as THREE from 'three';
 import { sandNormal, radialTexture, terrainNoise } from './textures.js';
-import { makeSky, envFromSky, boardFormed, windowsTexture, waterMaterial, box, person, tree, floaters, smooth, lerp, clamp } from './kit.js';
+import { makeSky, envFromSky, loadHDR, envIntensity, boardFormed, windowsTexture, waterMaterial, box, person, tree, floaters, smooth, lerp, clamp } from './kit.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const dotTex = radialTexture();
@@ -35,6 +35,20 @@ function rig(keys) {
     drag(dx) { dragging = true; yawV = dx * 0.004; yaw = clamp(yaw + yawV, -1.1, 1.1); },
     release() { dragging = false; },
   };
+}
+
+// HDRI do cenário: ilumina por imagem e, quando `sky` é passado, vira o fundo (com a névoa na cor do horizonte).
+function hdri(renderer, scene, name, { mobile, sunDir, sky, bg = 1, env = 1, fog = 1 }) {
+  loadHDR(renderer, name, { mobile, sunDir, background: !!sky }).then(({ env: e, background, horizon }) => {
+    scene.environment?.dispose();
+    scene.environment = e;
+    envIntensity(scene, env);
+    if (background) {
+      scene.background = background; scene.backgroundIntensity = bg; sky.visible = false;
+      // A névoa puxa para a cor do horizonte do HDRI (fog = quanto puxa)
+      scene.fog.color.lerp(horizon.multiplyScalar(bg), fog);
+    }
+  }).catch((err) => console.warn('[MONÓLITO] HDRI', name, err));
 }
 
 function sunLight(scene, dir, color, intensity, size, mobile) {
@@ -147,6 +161,8 @@ export function casaDuna(renderer, { mobile }) {
 
   const wind = floaters({ count: mobile ? 220 : 520, area: 70, y: [0, 3], color: '#ffe0bd', size: 0.07, opacity: 0.45, tex: dotTex });
   scene.add(wind);
+
+  hdri(renderer, scene, 'quarry_01', { mobile, sunDir, sky, bg: 0.7, env: 0.75, fog: 0.4 });
 
   const cam = rig([
     { u: 0, pos: [-31, 1.5, 33], look: [2, 4, 0] },
@@ -266,6 +282,8 @@ export function capelaFenda(renderer, { mobile }) {
   const flies = floaters({ count: mobile ? 70 : 160, area: 40, y: [0.3, 3], color: '#ffd98a', size: 0.16, opacity: 0.9, tex: dotTex });
   scene.add(flies);
 
+  hdri(renderer, scene, 'aarfontein_dawn_2', { mobile, sunDir, env: 0.06 });
+
   const cam = rig([
     { u: 0, pos: [0.6, 1.6, 38], look: [0, 3.4, 0] },
     { u: 0.4, pos: [-7, 1.3, 27], look: [0, 2.6, 5] },
@@ -302,7 +320,7 @@ export function capelaFenda(renderer, { mobile }) {
    ===================================================================== */
 export function pavilhaoArco(renderer, { mobile }) {
   const scene = new THREE.Scene();
-  const sunDir = V(0.55, 0.42, -0.35);
+  const sunDir = V(0.55, 0.55, -0.35); // elevação de ~40°, a mesma do sol do HDRI
   const sky = makeSky({ top: '#7aa3cc', horizon: '#ebe6dd', bottom: '#cfd5d6', sun: sunDir, sunColor: '#fff2dc', sunSize: 1600, glow: 0.22 });
   scene.add(sky);
   scene.environment = envFromSky(renderer, sky);
@@ -367,6 +385,8 @@ export function pavilhaoArco(renderer, { mobile }) {
   birdGeo.computeVertexNormals();
   const birdMat = new THREE.MeshBasicMaterial({ color: '#4f5458', side: THREE.DoubleSide });
   const birds = Array.from({ length: 11 }, (_, i) => { const b = new THREE.Mesh(birdGeo, birdMat); b.userData.k = i; scene.add(b); return b; });
+
+  hdri(renderer, scene, 'qwantani_mid_morning_puresky', { mobile, sunDir, sky, bg: 1.6, env: 1.0 });
 
   const cam = rig([
     { u: 0, pos: [15, 1.1, 34], look: [0, 3.4, 4] },
@@ -476,6 +496,8 @@ export function torreEstrato(renderer, { mobile }) {
   scene.add(cars);
   const street = new THREE.PointLight('#ffb070', 400, 90, 1.6);
   street.position.set(0, 6, 40); scene.add(street);
+
+  hdri(renderer, scene, 'modern_buildings_night', { mobile, env: 0.02 });
 
   const cam = rig([
     { u: 0, pos: [62, 3, 128], look: [0, 42, 0] },

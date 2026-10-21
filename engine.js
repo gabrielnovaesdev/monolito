@@ -7,17 +7,21 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { createDesert, smooth } from './desert.js';
 
-// Acabamento de lente: aberração cromática nas bordas, vinheta e grão animado.
+// Acabamento de lente: aberração cromática nas bordas, saturação/contraste pós-AgX, vinheta e grão animado.
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uAberr: { value: 0.002 }, uVignette: { value: 0.85 }, uGrain: { value: 0.035 } },
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uAberr: { value: 0.002 }, uVignette: { value: 0.85 }, uGrain: { value: 0.035 }, uSat: { value: 1.22 }, uCurve: { value: 0.35 } },
   vertexShader: /* glsl */`varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse; uniform float uTime, uAberr, uVignette, uGrain; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uTime, uAberr, uVignette, uGrain, uSat, uCurve; varying vec2 vUv;
     float rnd(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main() {
       vec2 c = vUv - 0.5; float d = length(c);
       vec2 off = c * uAberr * d * 4.0;
       vec3 col = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
+      // AgX "punchy": devolve a saturação e o contraste que a curva base tira
+      col = clamp(col, 0.0, 1.0);
+      col = mix(vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), col, uSat);
+      col = mix(col, col * col * (3.0 - 2.0 * col), uCurve);
       col *= mix(1.0, smoothstep(0.95, 0.2, d), uVignette * 0.55);
       col += (rnd(gl_FragCoord.xy + fract(uTime * 7.13) * 97.0) - 0.5) * uGrain;
       gl_FragColor = vec4(col, 1.0);
@@ -89,8 +93,8 @@ export function createEngine(canvas, { onHover, onIndex, onContextLost } = {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.25 : 1.6));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.92;
+  renderer.toneMapping = THREE.AgXToneMapping;
+  renderer.toneMappingExposure = 1.12;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); onContextLost?.(); });

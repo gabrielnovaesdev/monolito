@@ -1,5 +1,6 @@
 // Peças compartilhadas pelos cenários: céu, materiais, água, pessoas, árvores e janelas.
 import * as THREE from 'three';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { fbm } from './textures.js';
 
 export const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -46,6 +47,61 @@ export function envFromSky(renderer, sky) {
   const tex = pm.fromScene(s, 0, 0.1, 600).texture;
   pm.dispose();
   return tex;
+}
+
+/* ---------- HDRI (Poly Haven, CC0) ---------- */
+// Carrega em segundo plano (nunca bloqueia o primeiro quadro), gira o panorama para o sol do HDRI
+// coincidir com o sol da cena e corta o pico do sol no mapa de ambiente (a DirectionalLight já faz esse papel).
+const hdrFiles = new Map();
+function fetchHDR(name, mobile) {
+  const url = `assets/hdri/${name}_${mobile ? '1k' : '2k'}.hdr`;
+  if (!hdrFiles.has(url)) hdrFiles.set(url, new RGBELoader().loadAsync(url));
+  return hdrFiles.get(url);
+}
+export async function loadHDR(renderer, name, { mobile, sunDir, clamp = 60, background = false } = {}) {
+  const src = await fetchHDR(name, mobile);
+  const { width: w, height: h } = src.image, from = THREE.DataUtils.fromHalfFloat, to = THREE.DataUtils.toHalfFloat;
+  const data = src.image.data; // RGBA em meio-float, linha 0 = topo
+  // Sol do HDRI: pixel mais brilhante na metade de cima
+  let best = 0, bi = 0;
+  for (let i = 0; i < (w * h) / 2; i++) { const l = from(data[i * 4]) * 0.21 + from(data[i * 4 + 1]) * 0.72 + from(data[i * 4 + 2]) * 0.07; if (l > best) { best = l; bi = i; } }
+  let shift = 0;
+  if (sunDir) {
+    const azH = (((bi % w) + 0.5) / w - 0.5) * Math.PI * 2, azT = Math.atan2(sunDir.z, sunDir.x);
+    shift = Math.round(((azT - azH) / (Math.PI * 2)) * w);
+  }
+  const rot = new Uint16Array(data.length);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const a = (y * w + x) * 4, b = (y * w + ((((x + shift) % w) + w) % w)) * 4;
+    rot[b] = data[a]; rot[b + 1] = data[a + 1]; rot[b + 2] = data[a + 2]; rot[b + 3] = data[a + 3];
+  }
+  // Cor do céu logo acima do horizonte (para a névoa casar com o fundo)
+  const hz = new THREE.Color(0, 0, 0); let n = 0;
+  for (let y = Math.floor(h * 0.466); y < h / 2; y++) for (let x = 0; x < w; x += 4) { const a = (y * w + x) * 4; hz.r += from(rot[a]); hz.g += from(rot[a + 1]); hz.b += from(rot[a + 2]); n++; }
+  hz.multiplyScalar(1 / n);
+  const make = (arr) => {
+    const t = new THREE.DataTexture(arr, w, h, THREE.RGBAFormat, THREE.HalfFloatType);
+    t.colorSpace = THREE.LinearSRGBColorSpace; t.mapping = THREE.EquirectangularReflectionMapping;
+    t.minFilter = t.magFilter = THREE.LinearFilter; t.generateMipmaps = false; t.flipY = true; t.needsUpdate = true;
+    return t;
+  };
+  // Ambiente: pico do sol limitado a `clamp` × o horizonte
+  const lim = Math.max(hz.r, hz.g, hz.b) * clamp, cl = rot.slice();
+  for (let i = 0; i < cl.length; i += 4) {
+    const m = Math.max(from(cl[i]), from(cl[i + 1]), from(cl[i + 2]));
+    if (m > lim) { const k = lim / m; cl[i] = to(from(cl[i]) * k); cl[i + 1] = to(from(cl[i + 1]) * k); cl[i + 2] = to(from(cl[i + 2]) * k); }
+  }
+  const envSrc = make(cl), pm = new THREE.PMREMGenerator(renderer);
+  const env = pm.fromEquirectangular(envSrc).texture;
+  pm.dispose(); envSrc.dispose();
+  return { env, background: background ? make(rot) : null, horizon: hz };
+}
+// Ajusta a força do ambiente em todos os materiais da cena (o three 0.160 ainda não tem scene.environmentIntensity).
+export function envIntensity(scene, k) {
+  scene.traverse((o) => {
+    const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+    ms.forEach((m) => { if ('envMapIntensity' in m) { m.userData.envBase ??= m.envMapIntensity; m.envMapIntensity = m.userData.envBase * k; } });
+  });
 }
 
 /* ---------- Texturas ---------- */

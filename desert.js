@@ -1,6 +1,7 @@
 // Deserto ao entardecer: céu com nuvens, dunas, montanhas no horizonte e o monólito que se abre.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { loadHDR, envIntensity } from './kit.js';
 import { sandNormal, stoneMaps, radialTexture, beamTexture, terrainNoise } from './textures.js';
 
 export const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -445,6 +446,12 @@ export function createDesert(renderer, { mobile }) {
     }
     return { open: o, white: 0 };
   }
+
+  // HDRI do deserto: só depois do primeiro quadro e com o navegador ocioso (o hero nunca espera por ele)
+  new Promise((r) => (window.requestIdleCallback || setTimeout)(r, { timeout: 2500 }))
+    .then(() => loadHDR(renderer, 'quarry_01', { mobile, sunDir: sunBase }))
+    .then(({ env }) => { scene.environment.dispose(); scene.environment = env; envIntensity(scene, 0.8); })
+    .catch((err) => console.warn('[MONÓLITO] HDRI', err));
 
   return {
     scene, update, targets: halves,
