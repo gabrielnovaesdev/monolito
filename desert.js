@@ -205,7 +205,7 @@ export function createDesert(renderer, { mobile }) {
   wallMat.normalMap = stone.normal.clone(); wallMat.roughnessMap = stone.rough.clone();
   wallMat.normalMap.repeat.set(CORR / 0.85, 2.6); wallMat.roughnessMap.repeat.set(CORR / 0.85, 2.6);
   wallMat.normalMap.needsUpdate = wallMat.roughnessMap.needsUpdate = true;
-  wallMat.normalScale.set(0.35, 0.35);
+  wallMat.normalScale.set(0.22, 0.22);
   const floorMat = wallMat.clone();
   floorMat.normalMap = stone.normal.clone(); floorMat.roughnessMap = stone.rough.clone();
   floorMat.normalMap.repeat.set(3.4 / 0.85, CORR / 0.85); floorMat.roughnessMap.repeat.set(3.4 / 0.85, CORR / 0.85);
@@ -236,7 +236,7 @@ export function createDesert(renderer, { mobile }) {
 
   // Monólitos distantes dão escala
   [[-34, -62, 0.7, 0.3], [48, -110, 0.9, -0.5], [-90, -150, 1.2, 0.8]].forEach(([x, z, s, r]) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(W * s, H * s, D * s), stoneMat);
+    const m = new THREE.Mesh(new RoundedBoxGeometry(W * s, H * s, D * s, 3, 0.03 * s), stoneMat);
     m.position.set(x, (H * s) / 2 - 0.2, z);
     m.rotation.y = r;
     scene.add(m);

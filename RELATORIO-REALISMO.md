@@ -1,5 +1,45 @@
 # Relatório: realismo do MONÓLITO
 
+## Conclusão
+
+**Veredito: limite de melhora alcançado** (não "beirando a realidade"). Média final 7,1, contra ~5,5 estimado na versão anterior.
+O ciclo parou porque as iterações 2 e 3 subiram a média menos de 0,2 cada: o que falta pede recursos que não estão ao meu alcance aqui.
+
+Notas finais por cenário (L iluminação · M materiais · Mo modelos · V vida · C câmera):
+
+| Cenário | L | M | Mo | V | C | Média |
+|---|---|---|---|---|---|---|
+| hero | 8 | 8 | 6 | 6 | 8 | 7,2 |
+| fresta / giro | 7,5 | 7 | 6,5 | 6 | 8 | 7,0 |
+| corredor | 6,5 | 6,5 | 6,5 | 5,5 | 7,5 | 6,5 |
+| porta de luz | 7 | 7 | 7 | 6 | 7 | 6,8 |
+| Casa Duna | 7,5 | 7,5 | 8 | 7 | 8 | 7,6 |
+| Capela | 7 | 7,5 | 7,5 | 7 | 7,5 | 7,3 |
+| Pavilhão | 8,5 | 8 | 7 | 8 | 8,5 | 8,0 |
+| Torre | 7 | 7 | 6,5 | 7 | 7,5 | 7,0 |
+| fenda | 6 | 7 | 7 | 6,5 | 7,5 | 6,8 |
+| contato | 8 | 8 | 6 | 6 | 8 | 7,2 |
+
+Nenhum cenário chegou a 8,5. Não vejo defeito grave de iluminação nas capturas finais (sem peter-panning, acne ou HDRI e sol desalinhados). O que sobra: o véu de bloom da fenda (faz parte do desenho da transição, só foi atenuado) e as faces de duna na sombra ficando azuladas na Casa Duna (fisicamente plausível, mas destoa).
+
+**Desempenho.** Desktop, nesta GPU, com vsync desligado: 153 fps no pior caso (fenda, que renderiza dois mundos) e 230–370 nos demais. O piso pedido era 40 (meta 50). O celular roda sem N8AO, SMAA, bokeh nem reflexo, com DPR ≤ 1,25 e HDRI 1K. O teste foi só em emulação, não em aparelho real.
+Carregamento: FCP ~0,2 s, LCP ~4,1 s (é a animação de entrada do título, igual a antes), CLS 0. O TBT aproximado subiu de ~0,5 s para ~1,15 s. Lighthouse oficial não rodou (ver "Como foi verificado"). O hero nunca espera assets dos projetos, mas os ~77 MB dos 4 projetos são baixados em segundo plano logo depois da entrada.
+
+**O que ficaria melhor com recursos fora do meu alcance:**
+- Pessoas com anatomia e animação reais: exigem captura de movimento ou bibliotecas com login (Mixamo).
+- Árvores e capim de alta densidade: os modelos CC0 têm de 1 a 5 milhões de polígonos; para a web seria preciso fazer impostores ou LODs à mão.
+- Travertino, pedra lioz e concreto escaneados de verdade (Poly Haven não tem travertino; ambientCG ficou de fora por causa do domínio do download).
+- Iluminação global de verdade (luz rebatida da areia, interiores) e névoa volumétrica: pedem render offline ou WebGPU com path tracing.
+- Lighthouse oficial e teste em celular real.
+
+**O que olhar primeiro:**
+1. `relatorio/final/pavilhao-ini-desk.jpg`: espelho d'água real, pedra lioz e oliveiras. É o cenário mais próximo de foto.
+2. `relatorio/final/duna-meio-desk.jpg`: Casa Duna modelada no Blender, com mobiliário e AO assado.
+3. `relatorio/final/torre-meio-desk.jpg` comparado com `relatorio/antes/torre-meio-desk.jpg`: maior salto entre o antes e o depois.
+4. O celular (`relatorio/final/*-mob.jpg`), para conferir se o corte de efeitos ainda agrada.
+5. A transição em fenda rolando no navegador: é o ponto mais subjetivo (bloom).
+
+
 Execução autônoma agendada, 2026-10-21, branch `monolito` (sem push, sem merge).
 Layout, textos, transições e a coreografia da porta não foram alterados.
 
@@ -147,3 +187,20 @@ Notas na saída: Torre 7,0 (L 7 · M 7 · Mo 6,5 · V 7 · C 7,5) · Pavilhão 8
 FPS desktop: hero 370 · corredor 300 · porta 203 · Duna 338/266 · Capela 283/285 · Pavilhão 248/229 · Torre 336/328 · fenda 153 · contato 360.
 Carregamento: FCP 352 ms · LCP 4,3 s · TBT ≈ 1,2 s · CLS 0.
 Capturas: `relatorio/iter2/antes` e `relatorio/iter2/depois`.
+
+### Iteração 3
+
+Defeitos priorizados:
+1. Corredor: mesmo repetindo na escala certa, a pedra procedural ainda lembrava tecido sob o sol rasante.
+2. Monólitos distantes com quinas vivas de caixa (os de perto têm chanfro).
+3. Capela: capim de uma cor só, sem a mistura de verde e palha do cerrado.
+
+O que mudou: normal das paredes e do piso do corredor em 0,22; monólitos distantes com `RoundedBoxGeometry`; capim com cinco tons (verde a dourado) distribuídos por ruído, por instância.
+
+Notas na saída: corredor 6,5 · Capela 7,3 · demais iguais. **Média geral 7,1** (+0,05).
+
+FPS desktop: iguais aos da iteração 2 (variação < 2%). Celular emulado (390×844, DPR 2, sem efeitos caros): 417 fps na fenda, ≥ 500 nos demais. Isso roda na GPU desta máquina, então só mostra que o caminho de celular é bem mais leve; não é uma medida de aparelho real.
+Carregamento: FCP 176 ms · LCP 4,1 s · TBT ≈ 1,15 s · CLS 0.
+Capturas: `relatorio/iter3/antes`, `relatorio/iter3/depois` e o conjunto final completo (desktop e celular) em `relatorio/final`.
+
+Iterações 2 e 3 subiram a média menos de 0,2 cada: critério de parada "limite de melhora alcançado".

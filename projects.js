@@ -239,7 +239,9 @@ export function capelaFenda(renderer, { mobile }) {
   bladeGeo.translate(0, 0.35, 0);
   const bp = bladeGeo.attributes.position;
   for (let i = 0; i < bp.count; i++) bp.setX(i, bp.getX(i) * (1 - bp.getY(i) / 0.75));
-  const grassMat = new THREE.MeshStandardMaterial({ color: '#7d8a52', roughness: 0.9, side: THREE.DoubleSide });
+  const grassMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9, side: THREE.DoubleSide });
+  // Capim do cerrado: touceiras verdes misturadas a pontas secas e douradas
+  const grassTones = ['#6f7d48', '#7d8a52', '#8f8a55', '#a39360', '#5f6b3e'].map((c) => new THREE.Color(c));
   const wind = { value: 0 };
   grassMat.onBeforeCompile = (sh) => {
     sh.uniforms.uWind = wind;
@@ -259,6 +261,7 @@ export function capelaFenda(renderer, { mobile }) {
     q.setFromEuler(e);
     sc.set(1, 0.6 + Math.random() * 0.9, 1);
     ps.set(x, 0, z);
+    grass.setColorAt(k, grassTones[Math.floor((terrainNoise(x * 0.15, z * 0.15, 2) * 0.6 + Math.random() * 0.4) * grassTones.length) % grassTones.length]);
     grass.setMatrixAt(k++, mtx.compose(ps, q, sc));
   }
   grass.receiveShadow = true;
