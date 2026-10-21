@@ -1,7 +1,7 @@
 // Deserto ao entardecer: céu com nuvens, dunas, montanhas no horizonte e o monólito que se abre.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { loadHDR, envIntensity } from './kit.js';
+import { loadHDR, envIntensity, pbr, uvScale, takeLoads } from './kit.js';
 import { sandNormal, stoneMaps, radialTexture, beamTexture, terrainNoise } from './textures.js';
 
 export const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -102,11 +102,15 @@ export function createDesert(renderer, { mobile }) {
     gp.setY(i, h * smooth(9, 48, Math.hypot(x, z * 0.85)) - 0.05);
   }
   groundGeo.computeVertexNormals();
+  uvScale(groundGeo, 300);
   const sandN = sandNormal(256);
-  sandN.repeat.set(110, 110);
-  const ground = new THREE.Mesh(groundGeo, new THREE.MeshStandardMaterial({
-    color: '#c8a27c', roughness: 0.96, normalMap: sandN, normalScale: new THREE.Vector2(0.32, 0.32),
-  }));
+  sandN.repeat.setScalar(110 / 300);
+  // Grão e cor da areia (PBR, chega depois do primeiro quadro) com as ondulações de vento procedurais
+  const sandMat = pbr('dense_sand', { size: 1.8, normal: false, color: '#c8a27c', roughness: 1 });
+  sandMat.userData.ready.then(() => sandMat.color.set('#efc79f')); // cor lisa até a textura chegar
+  sandMat.normalMap = sandN; sandMat.normalScale.set(0.32, 0.32);
+  takeLoads(); // o hero não espera pela areia
+  const ground = new THREE.Mesh(groundGeo, sandMat);
   ground.receiveShadow = true;
   scene.add(ground);
 

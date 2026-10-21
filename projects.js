@@ -1,7 +1,7 @@
 // Quatro projetos em escala real, cada um no seu lugar, na sua hora e com vida própria.
 import * as THREE from 'three';
 import { sandNormal, radialTexture, terrainNoise } from './textures.js';
-import { makeSky, envFromSky, loadHDR, envIntensity, boardFormed, windowsTexture, waterMaterial, box, person, tree, floaters, smooth, lerp, clamp } from './kit.js';
+import { makeSky, envFromSky, loadHDR, envIntensity, pbr, uvScale, takeLoads, windowsTexture, waterMaterial, box, person, tree, floaters, smooth, lerp, clamp } from './kit.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const dotTex = radialTexture();
@@ -39,7 +39,7 @@ function rig(keys) {
 
 // HDRI do cenário: ilumina por imagem e, quando `sky` é passado, vira o fundo (com a névoa na cor do horizonte).
 function hdri(renderer, scene, name, { mobile, sunDir, sky, bg = 1, env = 1, fog = 1 }) {
-  loadHDR(renderer, name, { mobile, sunDir, background: !!sky }).then(({ env: e, background, horizon }) => {
+  return loadHDR(renderer, name, { mobile, sunDir, background: !!sky }).then(({ env: e, background, horizon }) => {
     scene.environment?.dispose();
     scene.environment = e;
     envIntensity(scene, env);
@@ -104,22 +104,24 @@ export function casaDuna(renderer, { mobile }) {
     gp.setY(i, (Math.pow(1 - Math.abs(n * 2 - 1), 2) * 9 + n * 2) * smooth(26, 90, Math.hypot(x, z)) - 0.02);
   }
   gg.computeVertexNormals();
-  const sn = sandNormal(256); sn.repeat.set(160, 160);
-  const ground = new THREE.Mesh(gg, new THREE.MeshStandardMaterial({ color: '#c9a37d', roughness: 0.95, normalMap: sn, normalScale: new THREE.Vector2(0.3, 0.3) }));
+  uvScale(gg, 500);
+  const sn = sandNormal(256); sn.repeat.setScalar(0.32);
+  // Grão e cor da areia (PBR) com as ondulações de vento procedurais por cima
+  const sandMat = pbr('dense_sand', { size: 1.8, normal: false, color: '#ffd2a6', roughness: 1 });
+  sandMat.normalMap = sn; sandMat.normalScale.set(0.3, 0.3);
+  const ground = new THREE.Mesh(gg, sandMat);
   ground.receiveShadow = true;
   scene.add(ground);
 
-  const conc = boardFormed(206);
-  conc.repeat.set(2, 1);
   const M = {
-    concrete: new THREE.MeshStandardMaterial({ map: conc, roughness: 0.88 }),
-    deck: new THREE.MeshStandardMaterial({ color: '#d8ccb9', roughness: 0.8 }),
+    concrete: pbr('concrete_layers_02', { size: 2, color: '#f2e6d8' }),
+    deck: pbr('preconcrete_wall_001', { size: 1.2, color: '#fbf0e0', normalScale: 0.4, aoIntensity: 0.5 }),
     bronze: new THREE.MeshStandardMaterial({ color: '#3c3026', roughness: 0.35, metalness: 0.75 }),
     glass: new THREE.MeshPhysicalMaterial({ color: '#9fb0b0', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.28, envMapIntensity: 1.4 }),
     warm: new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffbf80').multiplyScalar(3) }),
     sofa: new THREE.MeshStandardMaterial({ color: '#b9a58c', roughness: 0.9 }),
     dark: new THREE.MeshStandardMaterial({ color: '#2a2622', roughness: 0.6 }),
-    rock: new THREE.MeshStandardMaterial({ color: '#6d5a48', roughness: 0.95, flatShading: true }),
+    rock: pbr('dark_rock', { size: 2.4, color: '#c49a78', flatShading: true }),
   };
   const water = waterMaterial('#3f6f7c', 3);
   const h = new THREE.Group();
@@ -162,7 +164,7 @@ export function casaDuna(renderer, { mobile }) {
   const wind = floaters({ count: mobile ? 220 : 520, area: 70, y: [0, 3], color: '#ffe0bd', size: 0.07, opacity: 0.45, tex: dotTex });
   scene.add(wind);
 
-  hdri(renderer, scene, 'quarry_01', { mobile, sunDir, sky, bg: 0.7, env: 0.75, fog: 0.4 });
+  const hdr = hdri(renderer, scene, 'quarry_01', { mobile, sunDir, sky, bg: 0.7, env: 0.75, fog: 0.4 });
 
   const cam = rig([
     { u: 0, pos: [-31, 1.5, 33], look: [2, 4, 0] },
@@ -184,7 +186,7 @@ export function casaDuna(renderer, { mobile }) {
     if (!s.paused) for (let i = 0; i < a.length; i += 3) { a[i] += 0.05 * s.n; a[i + 1] += Math.sin(s.t + i) * 0.002; if (a[i] > 35) a[i] = -35; }
     wind.geometry.attributes.position.needsUpdate = true;
   }
-  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, bloom: { strength: 0.45, radius: 0.42, threshold: 1.0 } };
+  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]), bloom: { strength: 0.45, radius: 0.42, threshold: 1.0 } };
 }
 
 /* =====================================================================
@@ -209,7 +211,8 @@ export function capelaFenda(renderer, { mobile }) {
     gp.setY(i, terrainNoise(x * 0.02, z * 0.02, 3) * 6 * smooth(18, 70, Math.hypot(x, z)) - 0.02);
   }
   gg.computeVertexNormals();
-  const ground = new THREE.Mesh(gg, new THREE.MeshStandardMaterial({ color: '#3e4a31', roughness: 0.95 }));
+  uvScale(gg, 300);
+  const ground = new THREE.Mesh(gg, pbr('forrest_ground_01', { size: 2, color: '#9aa486' }));
   ground.receiveShadow = true;
   scene.add(ground);
 
@@ -244,9 +247,7 @@ export function capelaFenda(renderer, { mobile }) {
   scene.add(grass);
 
   // Capela: cubo de concreto com cruz vazada; uma luz interna projeta a cruz no capim
-  const conc = boardFormed(188);
-  conc.repeat.set(2, 2);
-  const cm = new THREE.MeshStandardMaterial({ map: conc, roughness: 0.9 });
+  const cm = pbr('concrete_layers_02', { size: 2, color: '#d8d0c6' });
   const c = new THREE.Group();
   scene.add(c);
   const W = 8, H = 9, T = 0.5;
@@ -268,7 +269,7 @@ export function capelaFenda(renderer, { mobile }) {
   c.add(spot, spot.target);
 
   // Caminho de pedras, banco, árvore e uma pessoa chegando
-  const stone = new THREE.MeshStandardMaterial({ color: '#8d8578', roughness: 0.9 });
+  const stone = pbr('granite_tile_03', { size: 3.6, color: '#d8d2c8' });
   for (let i = 0; i < 16; i++) {
     const z = 5.5 + i * 1.55, x = Math.sin(i * 0.5) * 0.35;
     const st = box(scene, 1.2, 0.08, 0.8, stone, x, 0.04, z);
@@ -282,7 +283,7 @@ export function capelaFenda(renderer, { mobile }) {
   const flies = floaters({ count: mobile ? 70 : 160, area: 40, y: [0.3, 3], color: '#ffd98a', size: 0.16, opacity: 0.9, tex: dotTex });
   scene.add(flies);
 
-  hdri(renderer, scene, 'aarfontein_dawn_2', { mobile, sunDir, env: 0.06 });
+  const hdr = hdri(renderer, scene, 'aarfontein_dawn_2', { mobile, sunDir, env: 0.06 });
 
   const cam = rig([
     { u: 0, pos: [0.6, 1.6, 38], look: [0, 3.4, 0] },
@@ -312,7 +313,7 @@ export function capelaFenda(renderer, { mobile }) {
     spot.intensity = 900 * (0.94 + Math.sin(s.t * 1.3) * 0.03 + Math.sin(s.t * 5.1) * 0.02);
     t1.userData.sway(s.t); t2.userData.sway(s.t);
   }
-  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, bloom: { strength: 0.75, radius: 0.5, threshold: 0.9 } };
+  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]), bloom: { strength: 0.75, radius: 0.5, threshold: 0.9 } };
 }
 
 /* =====================================================================
@@ -328,21 +329,8 @@ export function pavilhaoArco(renderer, { mobile }) {
   sunLight(scene, sunDir, '#fff0dc', 3.1, 40, mobile);
   scene.add(new THREE.HemisphereLight('#cfe0f2', '#d9cfbf', 0.75));
 
-  // Praça de travertino com juntas
-  const tiles = (() => {
-    const c = document.createElement('canvas'); c.width = c.height = 256;
-    const g = c.getContext('2d');
-    for (let y = 0; y < 4; y++) for (let x = 0; x < 2; x++) {
-      const v = 226 + (Math.random() - 0.5) * 14;
-      g.fillStyle = `rgb(${v},${v - 6},${v - 18})`; g.fillRect(x * 128, y * 64, 128, 64);
-    }
-    g.strokeStyle = 'rgba(120,105,85,.35)'; g.lineWidth = 2;
-    for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(0, i * 64); g.lineTo(256, i * 64); g.stroke(); }
-    for (let i = 0; i <= 2; i++) { g.beginPath(); g.moveTo(i * 128, 0); g.lineTo(i * 128, 256); g.stroke(); }
-    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.repeat.set(30, 30);
-    return t;
-  })();
-  const plaza = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.MeshStandardMaterial({ map: tiles, roughness: 0.75 }));
+  // Praça de pedra clara com juntas (PBR)
+  const plaza = new THREE.Mesh(uvScale(new THREE.PlaneGeometry(120, 120), 120), pbr('large_floor_tiles_02', { size: 3, color: '#fff6e6' }));
   plaza.rotation.x = -Math.PI / 2; plaza.receiveShadow = true; scene.add(plaza);
 
   const pool = waterMaterial('#6d8893', 4);
@@ -351,11 +339,11 @@ export function pavilhaoArco(renderer, { mobile }) {
   const river = waterMaterial('#5d7d8c', 40);
   const tejo = new THREE.Mesh(new THREE.PlaneGeometry(900, 500), river);
   tejo.rotation.x = -Math.PI / 2; tejo.position.set(0, -0.6, -310); scene.add(tejo);
-  const edge = new THREE.MeshStandardMaterial({ color: '#d9cfbe', roughness: 0.7 });
+  const edge = pbr('preconcrete_wall_001', { size: 1.2, color: '#f6ecdc', normalScale: 0.5, aoIntensity: 0.6 });
   box(scene, 120, 0.7, 1.2, edge, 0, -0.25, -60.6);
 
   // Sete arcos em escala real (7 m de vão, 9 m de altura)
-  const trav = new THREE.MeshStandardMaterial({ color: '#e9dfcd', roughness: 0.62 });
+  const trav = pbr('preconcrete_wall_001', { size: 1.2, color: '#fff8ee', normalScale: 0.5, aoIntensity: 0.6 }); // pedra porosa clara, no lugar do travertino
   const ag = archGeo(7.4, 5.6, 0.95, 1.3);
   for (let i = 0; i < 7; i++) {
     const a = new THREE.Mesh(ag, trav);
@@ -386,7 +374,7 @@ export function pavilhaoArco(renderer, { mobile }) {
   const birdMat = new THREE.MeshBasicMaterial({ color: '#4f5458', side: THREE.DoubleSide });
   const birds = Array.from({ length: 11 }, (_, i) => { const b = new THREE.Mesh(birdGeo, birdMat); b.userData.k = i; scene.add(b); return b; });
 
-  hdri(renderer, scene, 'qwantani_mid_morning_puresky', { mobile, sunDir, sky, bg: 1.6, env: 1.0 });
+  const hdr = hdri(renderer, scene, 'qwantani_mid_morning_puresky', { mobile, sunDir, sky, bg: 1.6, env: 1.0 });
 
   const cam = rig([
     { u: 0, pos: [15, 1.1, 34], look: [0, 3.4, 4] },
@@ -414,7 +402,7 @@ export function pavilhaoArco(renderer, { mobile }) {
     });
     trees.forEach((t) => t.userData.sway(s.t, 0.6));
   }
-  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, bloom: { strength: 0.3, radius: 0.4, threshold: 1.25 } };
+  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]), bloom: { strength: 0.3, radius: 0.4, threshold: 1.25 } };
 }
 
 /* =====================================================================
@@ -430,14 +418,14 @@ export function torreEstrato(renderer, { mobile }) {
   const moon = new THREE.DirectionalLight('#9fb0e0', 0.5);
   moon.position.set(-60, 120, 40); scene.add(moon);
 
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), new THREE.MeshStandardMaterial({ color: '#16171b', roughness: 0.32, metalness: 0.2 }));
+  const ground = new THREE.Mesh(uvScale(new THREE.PlaneGeometry(1200, 1200), 1200), pbr('asphalt_02', { size: 3, color: '#5a5c63', roughness: 0.55 })); // asfalto úmido
   ground.rotation.x = -Math.PI / 2; scene.add(ground);
 
   // Torre: lajes giradas, vidro com andares acesos, núcleo de bronze e coroa
   const F = mobile ? 26 : 32, FH = 3.6;
   const tower = new THREE.Group();
   scene.add(tower);
-  const slabMat = new THREE.MeshStandardMaterial({ color: '#8b857b', roughness: 0.6 });
+  const slabMat = pbr('concrete_layers_02', { size: 2, color: '#c9c1b5' });
   // Montantes verticais: o andar aceso vira uma fileira de janelas, não um bloco de luz
   const mull = (() => {
     const c = document.createElement('canvas'); c.width = 256; c.height = 32;
@@ -497,7 +485,7 @@ export function torreEstrato(renderer, { mobile }) {
   const street = new THREE.PointLight('#ffb070', 400, 90, 1.6);
   street.position.set(0, 6, 40); scene.add(street);
 
-  hdri(renderer, scene, 'modern_buildings_night', { mobile, env: 0.02 });
+  const hdr = hdri(renderer, scene, 'modern_buildings_night', { mobile, env: 0.02 });
 
   const cam = rig([
     { u: 0, pos: [62, 3, 128], look: [0, 42, 0] },
@@ -520,7 +508,7 @@ export function torreEstrato(renderer, { mobile }) {
     });
     cars.instanceMatrix.needsUpdate = true;
   }
-  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, bloom: { strength: 0.85, radius: 0.6, threshold: 0.85 } };
+  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]), bloom: { strength: 0.85, radius: 0.6, threshold: 0.85 } };
 }
 
 export const PROJECTS = [casaDuna, capelaFenda, pavilhaoArco, torreEstrato];

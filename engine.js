@@ -104,19 +104,21 @@ export function createEngine(canvas, { onHover, onIndex, onContextLost } = {}) {
   const desert = { ...desertCore, camera: desertCam, kind: 'desert' };
 
   // Projetos: criados sob demanda (e em segundo plano depois da entrada)
-  const projects = [null, null, null, null];
+  // Cada projeto só entra em cena depois que HDRI e texturas chegaram (e o shader final foi compilado).
+  const projects = [null, null, null, null], building = [];
   let projectsModule = null;
-  async function ensureProject(i) {
-    if (projects[i]) return projects[i];
-    projectsModule ??= import('./projects.js');
-    const mod = await projectsModule;
-    if (!projects[i]) {
-      projects[i] = mod.PROJECTS[i](renderer, { mobile });
-      projects[i].kind = 'project';
-      fitCamera(projects[i].camera);
-      renderer.compile(projects[i].scene, projects[i].camera);
-    }
-    return projects[i];
+  function ensureProject(i) {
+    return (building[i] ??= (async () => {
+      projectsModule ??= import('./projects.js');
+      const mod = await projectsModule;
+      const p = mod.PROJECTS[i](renderer, { mobile });
+      p.kind = 'project';
+      fitCamera(p.camera);
+      await p.ready?.catch(() => {});
+      renderer.compile(p.scene, p.camera);
+      projects[i] = p;
+      return p;
+    })());
   }
   async function preload() {
     for (let i = 0; i < 4; i++) {

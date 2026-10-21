@@ -104,6 +104,46 @@ export function envIntensity(scene, k) {
   });
 }
 
+/* ---------- Materiais PBR (Poly Haven, CC0, 1K) ---------- */
+// Mapas: cor (sRGB), normal (GL) e ARM (R = oclusão, G = rugosidade, B = metal).
+// `size` = metros cobertos por uma repetição; as geometrias usam UV em metros (metricUV / uvScale).
+const texLoader = new THREE.TextureLoader();
+const texFiles = new Map();
+const loadTex = (url) => { if (!texFiles.has(url)) texFiles.set(url, texLoader.loadAsync(url)); return texFiles.get(url); };
+const pendingLoads = [];
+// Cargas pendentes criadas desde a última chamada (cada cenário recolhe as suas para esperar antes de compilar).
+export const takeLoads = () => pendingLoads.splice(0);
+export function pbr(name, { size = 2, normalScale = 1, aoIntensity = 1, normal = true, ...params } = {}) {
+  const mat = new THREE.MeshStandardMaterial({ roughness: 1, ...params });
+  const base = `assets/tex/${name}_`;
+  mat.userData.ready = Promise.all(['diff', 'nor_gl', 'arm'].map((k) => loadTex(`${base}${k}_1k.jpg`))).then(([d, n, a]) => {
+    const [map, nor, arm] = [d, n, a].map((t) => {
+      const c = t.clone();
+      c.wrapS = c.wrapT = THREE.RepeatWrapping; c.repeat.setScalar(1 / size); c.anisotropy = 8; c.needsUpdate = true;
+      return c;
+    });
+    map.colorSpace = THREE.SRGBColorSpace;
+    Object.assign(mat, { map, roughnessMap: arm, aoMap: arm, aoMapIntensity: aoIntensity });
+    if (normal) { mat.normalMap = nor; mat.normalScale.setScalar(normalScale); }
+    mat.needsUpdate = true;
+  }).catch((err) => console.warn('[MONÓLITO] textura', name, err));
+  pendingLoads.push(mat.userData.ready);
+  return mat;
+}
+// Multiplica as UVs de uma geometria (planos grandes: UV 0..1 → metros).
+export function uvScale(geo, sx, sy = sx) {
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * sx, uv.getY(i) * sy);
+  return geo;
+}
+// UVs de uma caixa em metros, face a face (+x, -x, +y, -y, +z, -z), para a textura manter a escala real.
+function metricUV(geo, w, h, d) {
+  const dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+  const uv = geo.attributes.uv;
+  for (let v = 0; v < uv.count; v++) { const f = Math.floor(v / 4); uv.setXY(v, uv.getX(v) * dims[f][0], uv.getY(v) * dims[f][1]); } // 4 vértices por face
+  return geo;
+}
+
 /* ---------- Texturas ---------- */
 function canvasTex(w, h, paint, srgb = false) {
   const c = document.createElement('canvas');
@@ -114,28 +154,6 @@ function canvasTex(w, h, paint, srgb = false) {
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
   return t;
-}
-
-// Concreto aparente com marcas de fôrma de tábua (cor + rugosidade em um só mapa).
-export function boardFormed(tone = 205) {
-  return canvasTex(256, 256, (g, w, h) => {
-    for (let y = 0; y < h; y += 16) {
-      const b = tone + (Math.random() - 0.5) * 18;
-      g.fillStyle = `rgb(${b},${b - 3},${b - 8})`;
-      g.fillRect(0, y, w, 16);
-      g.fillStyle = 'rgba(0,0,0,.08)';
-      g.fillRect(0, y, w, 1);
-    }
-    for (let i = 0; i < 3500; i++) {
-      const v = Math.random() < 0.5 ? 0 : 255;
-      g.fillStyle = `rgba(${v},${v},${v},.05)`;
-      g.fillRect(Math.random() * w, Math.random() * h, 2, 1);
-    }
-    for (let i = 0; i < 40; i++) { // furos de tirante
-      g.fillStyle = 'rgba(0,0,0,.18)';
-      g.beginPath(); g.arc((i % 8) * 32 + 16, Math.floor(i / 8) * 52 + 26, 1.6, 0, 7); g.fill();
-    }
-  }, true);
 }
 
 // Grade de janelas acesas aleatoriamente (para a cidade à noite).
@@ -180,7 +198,7 @@ export function waterMaterial(color = '#5d7480', repeat = 6) {
 
 /* ---------- Construção ---------- */
 export function box(parent, w, h, d, mat, x, y, z, { cast = true, receive = true } = {}) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  const m = new THREE.Mesh(metricUV(new THREE.BoxGeometry(w, h, d), w, h, d), mat);
   m.position.set(x, y, z);
   m.castShadow = cast; m.receiveShadow = receive;
   parent.add(m);
