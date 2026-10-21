@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MONÓLITO — Arquitetura e design</title>
+  <meta name="description" content="MONÓLITO é um estúdio de arquitetura e design que desenha volumes feitos para permanecer." />
+  <meta name="theme-color" content="#1a1714" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='11' y='3' width='10' height='26' rx='1' fill='%231d1b19'/%3E%3Crect x='15.5' y='3' width='1' height='26' fill='%23f0a35e'/%3E%3C/svg%3E" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+  <link rel="preconnect" href="https://unpkg.com" crossorigin />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@200..600&display=swap" media="print" onload="this.media='all'" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js" crossorigin />
+  <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+  <script>
+    document.documentElement.classList.add('js');
+    // Trava final: mesmo se algo falhar, a página nunca fica presa no loader.
+    setTimeout(function () { var d = document.documentElement; if (!d.classList.contains('is-ready')) { d.classList.add('is-ready', 'is-fallback'); var l = document.querySelector('.loader'); if (l) l.remove(); } }, 10000);
+  </script>
+</head>
+<body>
+  <canvas class="scene" aria-hidden="true"></canvas>
+
+  <div class="loader" aria-hidden="true">
+    <div class="loader__mark"><span></span></div>
+    <span class="loader__name">MONÓLITO</span>
+    <div class="loader__bar"><span class="loader__label">Carregando a experiência</span><span class="loader__pct">0 %</span><i></i></div>
+  </div>
+
+  <div class="cursor" aria-hidden="true"><span class="cursor__ring"></span><span class="cursor__label"></span></div>
+
+  <header class="nav">
+    <a href="#topo" class="nav__logo" aria-label="MONÓLITO, início"><span class="nav__mark"></span><span class="nav__word">MONÓLITO</span></a>
+    <nav class="nav__links" aria-label="Principal">
+      <a href="#galeria"><span class="swap"><span data-t="Projetos">Projetos</span></span></a>
+      <a href="#estudio"><span class="swap"><span data-t="Estúdio">Estúdio</span></span></a>
+      <a href="#contato" class="nav__cta magnetic"><span class="swap"><span data-t="Contato">Contato</span></span></a>
+    </nav>
+  </header>
+
+  <main id="topo">
+    <!-- 01 · Jornada: deserto → abertura → passagem → luz -->
+    <section class="journey" aria-label="Apresentação">
+      <div class="stage">
+        <div class="hero">
+          <div class="hero__meta mono"><span>Estúdio de arquitetura e design</span><span>Atacama · 23°S · 18:42</span></div>
+          <h1 class="hero__title"><span class="ln"><span>Arquitetura feita</span></span><span class="ln"><span>para <em>permanecer</em>.</span></span></h1>
+          <p class="hero__lede">Volumes, casas e espaços desenhados para durar mais do que a moda que os cerca.</p>
+          <span class="hero__cue mono">Role para entrar <i></i></span>
+        </div>
+
+        <div class="chapter chapter--open">
+          <span class="mono"><span class="ln"><span>01 / Abertura</span></span></span>
+          <h2><span class="ln"><span>Toda forma</span></span><span class="ln"><span>começa <em>fechada</em>.</span></span></h2>
+        </div>
+
+        <div class="chapter chapter--pass">
+          <span class="mono"><span class="ln"><span>02 / Passagem</span></span></span>
+          <h2><span class="ln"><span>Do bruto</span></span><span class="ln"><span>ao <em>preciso</em>.</span></span></h2>
+          <p>Partimos da matéria, da luz e do lugar. O resto é subtração.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 02 · Galeria 3D -->
+    <section class="gallery" id="galeria" aria-label="Projetos selecionados">
+      <div class="gstage">
+        <div class="gscrim" aria-hidden="true"></div>
+        <div class="gcount mono"><b>01</b> / 04 <span>Projetos selecionados</span></div>
+        <span class="ghint mono" aria-hidden="true">Arraste para orbitar</span>
+        <ul class="works">
+          <li class="work">
+            <span class="work__n"><span class="ln"><span>01 — Residência</span></span></span>
+            <h3><span class="ln"><span>Casa <em>Duna</em></span></span></h3>
+            <p><span class="ln"><span>Dois volumes de concreto em balanço sobre uma faixa de vidro.</span></span><span class="ln"><span>A casa deixa o vento passar por baixo e a piscina guarda o pôr do sol.</span></span></p>
+            <dl class="facts">
+              <div><dt>Local</dt><dd>San Pedro de Atacama, CL</dd></div>
+              <div><dt>Área</dt><dd>420 m²</dd></div>
+              <div><dt>Materiais</dt><dd>Concreto aparente, vidro, bronze</dd></div>
+              <div><dt>Status</dt><dd>Concluída · 2025</dd></div>
+            </dl>
+          </li>
+          <li class="work">
+            <span class="work__n"><span class="ln"><span>02 — Espaço sagrado</span></span></span>
+            <h3><span class="ln"><span>Capela <em>Fenda</em></span></span></h3>
+            <p><span class="ln"><span>Um cubo cego de concreto no meio do capim.</span></span><span class="ln"><span>A única abertura é uma cruz, que à noite desenha luz no chão.</span></span></p>
+            <dl class="facts">
+              <div><dt>Local</dt><dd>Serra da Canastra, BR</dd></div>
+              <div><dt>Área</dt><dd>64 m²</dd></div>
+              <div><dt>Materiais</dt><dd>Concreto com fôrma de tábua</dd></div>
+              <div><dt>Status</dt><dd>Concluída · 2024</dd></div>
+            </dl>
+          </li>
+          <li class="work">
+            <span class="work__n"><span class="ln"><span>03 — Espaço público</span></span></span>
+            <h3><span class="ln"><span>Pavilhão <em>Arco</em></span></span></h3>
+            <p><span class="ln"><span>Sete arcos de travertino sobre um espelho d'água, à beira do Tejo.</span></span><span class="ln"><span>Atravessá-los é andar entre luz e sombra.</span></span></p>
+            <dl class="facts">
+              <div><dt>Local</dt><dd>Belém, Lisboa, PT</dd></div>
+              <div><dt>Área</dt><dd>1.800 m²</dd></div>
+              <div><dt>Materiais</dt><dd>Travertino, pedra lioz, água</dd></div>
+              <div><dt>Status</dt><dd>Concluída · 2023</dd></div>
+            </dl>
+          </li>
+          <li class="work">
+            <span class="work__n"><span class="ln"><span>04 — Uso misto</span></span></span>
+            <h3><span class="ln"><span>Torre <em>Estrato</em></span></span></h3>
+            <p><span class="ln"><span>Trinta e dois pavimentos que giram em torno de um núcleo de bronze,</span></span><span class="ln"><span>como camadas de rocha empilhadas sobre a cidade.</span></span></p>
+            <dl class="facts">
+              <div><dt>Local</dt><dd>Pinheiros, São Paulo, BR</dd></div>
+              <div><dt>Área</dt><dd>38.500 m²</dd></div>
+              <div><dt>Materiais</dt><dd>Concreto, vidro, bronze</dd></div>
+              <div><dt>Status</dt><dd>Em obra · 2027</dd></div>
+            </dl>
+          </li>
+        </ul>
+        <div class="gprog" aria-hidden="true"><i></i></div>
+      </div>
+    </section>
+
+    <!-- 03 · Estúdio (editorial) -->
+    <section class="studio" id="estudio">
+      <span class="label mono"><b>04</b> Estúdio</span>
+      <p class="statement" data-lines>Desenhamos menos para que cada coisa <em>pese</em> mais. Uma parede, uma fresta de luz, um material honesto.</p>
+      <div class="marquee" aria-hidden="true"><div class="marquee__track"><span>Subtrair <i></i> Habitar <i></i> Permanecer <i></i> Subtrair <i></i> Habitar <i></i> Permanecer <i></i></span><span>Subtrair <i></i> Habitar <i></i> Permanecer <i></i> Subtrair <i></i> Habitar <i></i> Permanecer <i></i></span></div></div>
+      <div class="stats">
+        <div><span class="stat" data-count="17">0</span><span class="mono">anos de prática</span></div>
+        <div><span class="stat" data-count="64">0</span><span class="mono">obras construídas</span></div>
+        <div><span class="stat" data-count="9">0</span><span class="mono">países</span></div>
+      </div>
+      <ol class="services">
+        <li><span class="mono">01</span><h3>Arquitetura</h3><p>Casas, capelas, pavilhões e edifícios, do estudo de terreno à obra.</p></li>
+        <li><span class="mono">02</span><h3>Interiores</h3><p>Espaços pensados a partir da luz, do toque e do silêncio.</p></li>
+        <li><span class="mono">03</span><h3>Objetos</h3><p>Mobiliário e peças em pedra, madeira e bronze, feitos sob medida.</p></li>
+      </ol>
+    </section>
+
+    <!-- 04 · Contato: de volta ao deserto -->
+    <section class="contact" id="contato">
+      <div class="cstage">
+        <span class="label mono"><b>05</b> Contato</span>
+        <h2 class="contact__title"><span class="ln"><span>Vamos erguer algo</span></span><span class="ln"><span>que <em>permaneça</em>.</span></span></h2>
+        <div class="contact__row">
+          <a class="mail" href="mailto:estudio@monolito.arq"><span class="swap"><span data-t="estudio@monolito.arq">estudio@monolito.arq</span></span></a>
+          <a class="btn magnetic" href="mailto:estudio@monolito.arq?subject=Novo%20projeto"><span>Iniciar um projeto</span><i aria-hidden="true">→</i></a>
+        </div>
+        <footer class="foot mono"><span>MONÓLITO © 2026</span><span>São Paulo · Atacama · Lisboa</span><span>Projeto conceito fictício</span></footer>
+      </div>
+    </section>
+  </main>
+
+  <div class="hud">
+    <span class="hud__drag mono" aria-hidden="true">Arraste o monólito</span>
+    <ol class="hud__chapters mono" aria-hidden="true">
+      <li class="is-on"><i></i>Monólito</li>
+      <li><i></i>Passagem</li>
+      <li><i></i>Projetos</li>
+      <li><i></i>Contato</li>
+    </ol>
+    <button class="hud__pause mono" type="button" aria-pressed="false">Pausar movimento</button>
+  </div>
+
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/CustomEase.min.js"></script>
+  <script defer src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
