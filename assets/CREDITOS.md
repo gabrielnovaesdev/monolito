@@ -35,3 +35,10 @@ Versões `_1k` de HDRI são reduções feitas localmente a partir do arquivo 2K 
 | models/arbusto.glb | https://polyhaven.com/a/othonna_cerarioides | CC0 | variantes b, d, f, 40 mil → 12 mil triângulos (texturas de caule em 512 px) | 0,7 MB |
 
 Decodificador Draco: `three@0.160.0/examples/jsm/libs/draco/gltf/` via cdn.jsdelivr.net (versão fixa).
+
+## Modelos próprios (gerados no Blender 5.2 por `blender/edificios.py`, sem assets externos)
+
+| Arquivo | Conteúdo | Tamanho |
+|---|---|---|
+| models/casa-duna.glb + casa-duna-ao.jpg | Casa Duna com chanfros, caixilhos, mobiliário e AO assado (Cycles) | 0,15 MB + 2,1 MB |
+| models/capela.glb + capela-ao.jpg | Capela com cruz recortada por booleana, bancos, altar e AO assado | 0,06 MB + 2,2 MB |

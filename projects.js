@@ -1,7 +1,7 @@
 // Quatro projetos em escala real, cada um no seu lugar, na sua hora e com vida própria.
 import * as THREE from 'three';
 import { sandNormal, radialTexture, terrainNoise } from './textures.js';
-import { makeSky, envFromSky, loadHDR, envIntensity, pbr, uvScale, takeLoads, windowsTexture, waterMaterial, mirrorWater, box, person, scatter, wind, floaters, smooth, lerp, clamp } from './kit.js';
+import { makeSky, envFromSky, loadHDR, envIntensity, pbr, uvScale, takeLoads, windowsTexture, waterMaterial, mirrorWater, box, person, scatter, wind, loadBuilding, floaters, smooth, lerp, clamp } from './kit.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const dotTex = radialTexture();
@@ -134,6 +134,7 @@ export function casaDuna(renderer, { mobile }) {
   // Desktop: a piscina reflete de verdade a casa e o céu
   const mirror = mobile ? null : mirrorWater(new THREE.PlaneGeometry(13, 4.2), { color: '#1f3c44', sunDir, sunColor: '#ffc995', size: 2.2, distortion: 0.35 });
   if (mirror) { mirror.position.set(-5, 0.556, 5.2); h.add(mirror); pool.visible = false; }
+  pool.userData.keep = true; if (mirror) mirror.userData.keep = true;
   box(h, 12, 3.2, 8, M.concrete, 2, 2.1, -2.5);                 // volume térreo
   box(h, 19, 0.3, 9.2, M.concrete, 4, 3.85, -2.4);              // laje do vidro
   box(h, 14, 2.9, 7.6, M.glass, 4, 5.45, -2.4, { cast: false }); // faixa de vidro
@@ -167,6 +168,12 @@ export function casaDuna(renderer, { mobile }) {
     shrubs.push({ x, z, y: -0.05, s: 0.9 + Math.random() * 1.2, r: Math.random() * 6.3 });
   }
   scatter(scene, 'arbusto-seco', shrubs, { variants: true, tint: '#e8d2b0' });
+  // Casa modelada no Blender (chanfros, caixilhos, mobiliário, AO assado) substitui as caixas acima
+  const wood = new THREE.MeshStandardMaterial({ color: '#7a5a40', roughness: 0.55 });
+  const fabric = new THREE.MeshStandardMaterial({ color: '#a8977f', roughness: 1 });
+  loadBuilding('casa-duna', { concreto: M.concrete, deck: M.deck, bronze: M.bronze, vidro: M.glass, luz: M.warm, sofa: M.sofa, escuro: M.dark, madeira: wood, tecido: fabric })
+    .then((model) => { h.children.filter((o) => o.isMesh && !o.userData.keep).forEach((o) => h.remove(o)); h.add(model); })
+    .catch((err) => console.warn('[MONÓLITO] casa-duna.glb', err));
   const standing = person(1); standing.position.set(0.5, 4, 0.6); standing.rotation.y = 0.3; h.add(standing);
   const walker = person(2); h.add(walker);
   const sitter = person(3); sitter.position.set(-9.6, 0.5, 3.1); sitter.rotation.y = Math.PI; sitter.scale.y = 0.62; h.add(sitter);
@@ -278,6 +285,7 @@ export function capelaFenda(renderer, { mobile }) {
   spot.shadow.mapSize.setScalar(mobile ? 512 : 1024);
   spot.shadow.bias = -0.0005;
   c.add(spot, spot.target);
+  back.userData.keep = true;
 
   // Caminho de pedras, banco, árvore e uma pessoa chegando
   const stone = pbr('granite_tile_03', { size: 3.6, color: '#d8d2c8' });
@@ -287,6 +295,13 @@ export function capelaFenda(renderer, { mobile }) {
     st.rotation.y = (Math.random() - 0.5) * 0.2;
   }
   box(scene, 2.6, 0.45, 0.6, cm, -5.5, 0.23, 10);
+  // Capela modelada no Blender (chanfros, bancos, altar, AO assado) substitui as caixas do cubo
+  loadBuilding('capela', {
+    concreto: cm, pedra: stone,
+    madeira: new THREE.MeshStandardMaterial({ color: '#6e5038', roughness: 0.6 }),
+    escuro: new THREE.MeshStandardMaterial({ color: '#2a2622', roughness: 0.6 }),
+  }).then((model) => { c.children.filter((o) => o.isMesh && !o.userData.keep).forEach((o) => c.remove(o)); c.add(model); })
+    .catch((err) => console.warn('[MONÓLITO] capela.glb', err));
   scatter(scene, 'arvore', [{ x: -13, z: -4, s: 2.1, r: 0.4 }, { x: 15, z: -9, s: 1.6, r: 2.2 }, { x: -24, z: -18, s: 1.9, r: 4 }], { windy: true });
   const bushes = [];
   for (let i = 0; bushes.length < (mobile ? 14 : 30) && i < 300; i++) {

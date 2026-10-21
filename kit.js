@@ -255,6 +255,30 @@ const draco = new DRACOLoader().setDecoderPath('https://cdn.jsdelivr.net/npm/thr
 const gltfLoader = new GLTFLoader().setDRACOLoader(draco);
 const modelFiles = new Map();
 const loadModel = (name) => { if (!modelFiles.has(name)) modelFiles.set(name, gltfLoader.loadAsync(`assets/models/${name}.glb`)); return modelFiles.get(name); };
+// Edifício modelado no Blender (blender/edificios.py): cada material do GLB é trocado pelo material do site
+// com o mesmo nome, e a oclusão assada (<nome>-ao.jpg, no UV1) entra como aoMap.
+export function loadBuilding(name, mats) {
+  const ready = Promise.all([
+    loadModel(name), texLoader.loadAsync(`assets/models/${name}-ao.jpg`),
+    ...Object.values(mats).map((m) => m.userData.ready).filter(Boolean),
+  ]).then(([gltf, ao]) => {
+    ao.channel = 1; ao.flipY = false;
+    const cache = new Map();
+    gltf.scene.traverse((o) => {
+      if (!o.isMesh) return;
+      const key = o.material.name, base = mats[key];
+      if (!base) return console.warn('[MONÓLITO] material sem par', key);
+      if (!o.geometry.attributes.uv1 || base.transparent || base.isMeshBasicMaterial) { o.material = base; return; }
+      if (!cache.has(key)) { const m = base.clone(); m.aoMap = ao; m.aoMapIntensity = 1; cache.set(key, m); }
+      o.material = cache.get(key);
+      o.castShadow = o.receiveShadow = true;
+    });
+    return gltf.scene;
+  });
+  pendingLoads.push(ready.catch(() => {}));
+  return ready;
+}
+
 // Vento compartilhado pelas folhas (o cenário ativo avança o tempo)
 export const wind = { value: 0 };
 function addWind(mat) {
