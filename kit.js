@@ -1,6 +1,7 @@
 // Peças compartilhadas pelos cenários: céu, materiais, água, pessoas, árvores e janelas.
 import * as THREE from 'three';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { Water } from 'three/addons/objects/Water.js';
 import { fbm } from './textures.js';
 
 export const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -194,6 +195,18 @@ export function waterMaterial(color = '#5d7480', repeat = 6) {
   const m = new THREE.MeshStandardMaterial({ color, roughness: 0.04, metalness: 0.15, normalMap: n, normalScale: new THREE.Vector2(0.35, 0.35), envMapIntensity: 1.2 });
   m.userData.flow = (t) => { n.offset.set(t * 0.012, t * 0.008); };
   return m;
+}
+
+// Espelho d'água com reflexo real (Water/Reflector do three): só no desktop, custa um render extra da cena.
+export function mirrorWater(geo, { color = '#2f4a52', sunDir, sunColor = '#fff0dc', size = 1.5, distortion = 0.6, res = 1024 } = {}) {
+  const w = new Water(geo, {
+    textureWidth: res, textureHeight: res, waterNormals: waterNormal(), sunDirection: sunDir.clone().normalize(),
+    sunColor, waterColor: color, distortionScale: distortion, fog: true, alpha: 1,
+  });
+  w.rotation.x = -Math.PI / 2;
+  w.material.uniforms.size.value = size;
+  w.userData.flow = (t) => { w.material.uniforms.time.value = t * 0.35; };
+  return w;
 }
 
 /* ---------- Construção ---------- */

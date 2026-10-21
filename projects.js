@@ -1,7 +1,7 @@
 // Quatro projetos em escala real, cada um no seu lugar, na sua hora e com vida própria.
 import * as THREE from 'three';
 import { sandNormal, radialTexture, terrainNoise } from './textures.js';
-import { makeSky, envFromSky, loadHDR, envIntensity, pbr, uvScale, takeLoads, windowsTexture, waterMaterial, box, person, tree, floaters, smooth, lerp, clamp } from './kit.js';
+import { makeSky, envFromSky, loadHDR, envIntensity, pbr, uvScale, takeLoads, windowsTexture, waterMaterial, mirrorWater, box, person, tree, floaters, smooth, lerp, clamp } from './kit.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const dotTex = radialTexture();
@@ -27,6 +27,7 @@ function rig(keys) {
       if (!dragging) { yawV += (-yaw * 0.01 - yawV * 0.08) * s.n; yaw += yawV * s.n; }
       off.subVectors(P, L).applyAxisAngle(THREE.Object3D.DEFAULT_UP, yaw);
       const dist = off.length();
+      camera.userData.focus = dist; // foco do bokeh no ponto que a câmera olha
       camera.position.copy(L).add(off);
       camera.position.x += s.mx * dist * 0.025;
       camera.position.y -= s.my * dist * 0.012;
@@ -107,7 +108,7 @@ export function casaDuna(renderer, { mobile }) {
   uvScale(gg, 500);
   const sn = sandNormal(256); sn.repeat.setScalar(0.32);
   // Grão e cor da areia (PBR) com as ondulações de vento procedurais por cima
-  const sandMat = pbr('dense_sand', { size: 1.8, normal: false, color: '#ffd2a6', roughness: 1 });
+  const sandMat = pbr('dense_sand', { size: 1.8, normal: false, color: '#f9b885', roughness: 1 });
   sandMat.normalMap = sn; sandMat.normalScale.set(0.3, 0.3);
   const ground = new THREE.Mesh(gg, sandMat);
   ground.receiveShadow = true;
@@ -130,6 +131,9 @@ export function casaDuna(renderer, { mobile }) {
   box(h, 30, 0.5, 16, M.deck, 0, 0.25, 0);
   const pool = box(h, 13, 0.06, 4.2, water, -5, 0.52, 5.2, { cast: false });
   pool.receiveShadow = true;
+  // Desktop: a piscina reflete de verdade a casa e o céu
+  const mirror = mobile ? null : mirrorWater(new THREE.PlaneGeometry(13, 4.2), { color: '#1f3c44', sunDir, sunColor: '#ffc995', size: 2.2, distortion: 0.35 });
+  if (mirror) { mirror.position.set(-5, 0.556, 5.2); h.add(mirror); pool.visible = false; }
   box(h, 12, 3.2, 8, M.concrete, 2, 2.1, -2.5);                 // volume térreo
   box(h, 19, 0.3, 9.2, M.concrete, 4, 3.85, -2.4);              // laje do vidro
   box(h, 14, 2.9, 7.6, M.glass, 4, 5.45, -2.4, { cast: false }); // faixa de vidro
@@ -177,6 +181,7 @@ export function casaDuna(renderer, { mobile }) {
     cam.update(u, s);
     sky.material.uniforms.uTime.value = s.t;
     water.userData.flow(s.t);
+    mirror?.userData.flow(s.t);
     const span = 17, ph = (s.t * 0.09) % 2;
     const d = ph < 1 ? ph : 2 - ph; // vai e volta pelo deck
     walker.position.set(-12 + d * span, 0.5, 6.8 + Math.sin(s.t * 0.2) * 0.2);
@@ -186,7 +191,7 @@ export function casaDuna(renderer, { mobile }) {
     if (!s.paused) for (let i = 0; i < a.length; i += 3) { a[i] += 0.05 * s.n; a[i + 1] += Math.sin(s.t + i) * 0.002; if (a[i] > 35) a[i] = -35; }
     wind.geometry.attributes.position.needsUpdate = true;
   }
-  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]), bloom: { strength: 0.45, radius: 0.42, threshold: 1.0 } };
+  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]), ao: { radius: 2, intensity: 3 }, bloom: { strength: 0.45, radius: 0.42, threshold: 1.0 } };
 }
 
 /* =====================================================================
@@ -313,7 +318,7 @@ export function capelaFenda(renderer, { mobile }) {
     spot.intensity = 900 * (0.94 + Math.sin(s.t * 1.3) * 0.03 + Math.sin(s.t * 5.1) * 0.02);
     t1.userData.sway(s.t); t2.userData.sway(s.t);
   }
-  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]), bloom: { strength: 0.75, radius: 0.5, threshold: 0.9 } };
+  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]), ao: { radius: 1.6, intensity: 2.5 }, bloom: { strength: 0.75, radius: 0.5, threshold: 0.9 } };
 }
 
 /* =====================================================================
@@ -336,6 +341,9 @@ export function pavilhaoArco(renderer, { mobile }) {
   const pool = waterMaterial('#6d8893', 4);
   const water = new THREE.Mesh(new THREE.PlaneGeometry(16, 52), pool);
   water.rotation.x = -Math.PI / 2; water.position.y = 0.03; water.receiveShadow = true; scene.add(water);
+  // Desktop: espelho d'água real sob os arcos
+  const mirror = mobile ? null : mirrorWater(new THREE.PlaneGeometry(16, 52), { color: '#2c4650', sunDir, size: 1.6, distortion: 0.5 });
+  if (mirror) { mirror.position.y = 0.031; scene.add(mirror); water.visible = false; }
   const river = waterMaterial('#5d7d8c', 40);
   const tejo = new THREE.Mesh(new THREE.PlaneGeometry(900, 500), river);
   tejo.rotation.x = -Math.PI / 2; tejo.position.set(0, -0.6, -310); scene.add(tejo);
@@ -386,6 +394,7 @@ export function pavilhaoArco(renderer, { mobile }) {
   function update(u, s) {
     cam.update(u, s);
     pool.userData.flow(s.t); river.userData.flow(s.t * 2);
+    mirror?.userData.flow(s.t);
     walkers.forEach((p) => {
       const d = p.userData;
       const ph = ((s.t * d.speed + d.offset) % 1);
@@ -402,7 +411,7 @@ export function pavilhaoArco(renderer, { mobile }) {
     });
     trees.forEach((t) => t.userData.sway(s.t, 0.6));
   }
-  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]), bloom: { strength: 0.3, radius: 0.4, threshold: 1.25 } };
+  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]), ao: { radius: 2.5, intensity: 3 }, bloom: { strength: 0.3, radius: 0.4, threshold: 1.25 } };
 }
 
 /* =====================================================================
@@ -508,7 +517,7 @@ export function torreEstrato(renderer, { mobile }) {
     });
     cars.instanceMatrix.needsUpdate = true;
   }
-  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]), bloom: { strength: 0.85, radius: 0.6, threshold: 0.85 } };
+  return { scene, camera: cam.camera, update, drag: cam.drag, release: cam.release, ready: Promise.all([hdr, ...takeLoads()]), ao: { radius: 6, intensity: 2.5 }, bloom: { strength: 0.85, radius: 0.6, threshold: 0.85 } };
 }
 
 export const PROJECTS = [casaDuna, capelaFenda, pavilhaoArco, torreEstrato];

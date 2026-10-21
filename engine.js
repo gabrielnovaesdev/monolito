@@ -5,6 +5,7 @@ import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { createDesert, smooth } from './desert.js';
 
 // Acabamento de lente: aberração cromática nas bordas, saturação/contraste pós-AgX, vinheta e grão animado.
@@ -28,6 +29,32 @@ const GradeShader = {
     }`,
 };
 
+// Bokeh sutil (só nos projetos, desktop): desfoque por coleta em espiral a partir da profundidade do N8AO.
+// Uma amostra mais próxima que o pixel só entra se o próprio desfoque dela o alcança (silhuetas nítidas).
+const DofShader = {
+  uniforms: { tColor: { value: null }, tDepth: { value: null }, uFocus: { value: 30 }, uAperture: { value: 6 }, uMaxBlur: { value: 7 }, uNear: { value: 0.1 }, uFar: { value: 1000 }, uRes: { value: new THREE.Vector2(1, 1) } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader: /* glsl */`
+    #include <packing>
+    uniform sampler2D tColor, tDepth; uniform float uFocus, uAperture, uMaxBlur, uNear, uFar; uniform vec2 uRes; varying vec2 vUv;
+    float vz(vec2 uv) { return -perspectiveDepthToViewZ(textureLod(tDepth, uv, 0.0).x, uNear, uFar); }
+    float coc(float z) { return clamp(uAperture * abs(z - uFocus) / max(z, 0.01), 0.0, uMaxBlur); }
+    void main() {
+      float z = vz(vUv), c = coc(z);
+      vec3 acc = texture2D(tColor, vUv).rgb; float w = 1.0;
+      if (c > 0.6) {
+        for (int i = 0; i < 24; i++) {
+          float r = sqrt((float(i) + 0.5) / 24.0) * c, a = float(i) * 2.39996;
+          vec2 uv = vUv + vec2(cos(a), sin(a)) * r / uRes;
+          float zs = vz(uv);
+          float k = zs >= z - 0.05 ? 1.0 : clamp(coc(zs) - r + 1.0, 0.0, 1.0);
+          acc += textureLod(tColor, uv, 0.0).rgb * k; w += k;
+        }
+      }
+      gl_FragColor = vec4(acc / w, 1.0);
+    }`,
+};
+
 // Renderiza um mundo, ou dois misturados por uma máscara: fenda vertical (entre projetos)
 // ou porta retangular que cresce (saída do corredor). A borda da máscara brilha em âmbar (HDR → bloom).
 class WorldMixPass extends Pass {
@@ -36,7 +63,10 @@ class WorldMixPass extends Pass {
     const opts = { type: THREE.HalfFloatType };
     this.rtA = new THREE.WebGLRenderTarget(1, 1, opts);
     this.rtB = new THREE.WebGLRenderTarget(1, 1, opts);
+    this.rtT = new THREE.WebGLRenderTarget(1, 1, opts);
     this.a = null; this.b = null; this.mix = 0; this.mask = 0;
+    this.ao = null; // N8AOPass compartilhado pelos mundos (desktop)
+    this.dof = null; // quadro do bokeh (desktop)
     this.quad = new FullScreenQuad(new THREE.ShaderMaterial({
       uniforms: { tA: { value: null }, tB: { value: null }, uMix: { value: 0 }, uMask: { value: 0 }, uAspect: { value: 1 }, uTime: { value: 0 } },
       vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
@@ -66,21 +96,38 @@ class WorldMixPass extends Pass {
         }`,
     }));
   }
-  setSize(w, h) { this.rtA.setSize(w, h); this.rtB.setSize(w, h); this.quad.material.uniforms.uAspect.value = w / h; }
+  setSize(w, h) {
+    this.w = w; this.h = h;
+    this.rtA.setSize(w, h); this.rtB.setSize(w, h); this.rtT.setSize(w, h);
+    this.ao?.setSize(w, h);
+    this.dof?.material.uniforms.uRes.value.set(w, h);
+    this.quad.material.uniforms.uAspect.value = w / h;
+  }
+  // Um mundo: cena → (oclusão de ambiente) → (bokeh) → alvo
+  draw(renderer, W, target) {
+    const ao = this.ao;
+    if (!ao || !W.ao) { renderer.setRenderTarget(target); renderer.render(W.scene, W.camera); return; }
+    const c = ao.configuration;
+    if (c.aoRadius !== W.ao.radius) c.aoRadius = W.ao.radius;
+    if (c.intensity !== W.ao.intensity) c.intensity = W.ao.intensity;
+    if (c.distanceFalloff !== (W.ao.falloff ?? 1)) c.distanceFalloff = W.ao.falloff ?? 1;
+    ao.scene = W.scene; ao.camera = W.camera;
+    const focus = this.dof && W.camera.userData.focus;
+    ao.render(renderer, focus ? this.rtT : target);
+    if (!focus) return;
+    const u = this.dof.material.uniforms;
+    u.tColor.value = this.rtT.texture; u.tDepth.value = ao.beautyRenderTarget.depthTexture;
+    u.uFocus.value = focus; u.uNear.value = W.camera.near; u.uFar.value = W.camera.far;
+    u.uAperture.value = 7 * (this.h / 900); u.uMaxBlur.value = 6 * (this.h / 900);
+    renderer.setRenderTarget(target);
+    this.dof.render(renderer);
+  }
   render(renderer, writeBuffer) {
     const target = this.renderToScreen ? null : writeBuffer;
-    if (!this.b || this.mix <= 0.0005) {
-      renderer.setRenderTarget(target);
-      renderer.render(this.a.scene, this.a.camera);
-      return;
-    }
-    if (this.mix >= 0.9995) {
-      renderer.setRenderTarget(target);
-      renderer.render(this.b.scene, this.b.camera);
-      return;
-    }
-    renderer.setRenderTarget(this.rtA); renderer.render(this.a.scene, this.a.camera);
-    renderer.setRenderTarget(this.rtB); renderer.render(this.b.scene, this.b.camera);
+    if (!this.b || this.mix <= 0.0005) return this.draw(renderer, this.a, target);
+    if (this.mix >= 0.9995) return this.draw(renderer, this.b, target);
+    this.draw(renderer, this.a, this.rtA);
+    this.draw(renderer, this.b, this.rtB);
     const u = this.quad.material.uniforms;
     u.tA.value = this.rtA.texture; u.tB.value = this.rtB.texture; u.uMix.value = this.mix; u.uMask.value = this.mask;
     renderer.setRenderTarget(target);
@@ -135,7 +182,19 @@ export function createEngine(canvas, { onHover, onIndex, onContextLost } = {}) {
   composer.addPass(mixPass);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
+  if (!mobile) composer.addPass(new SMAAPass(1, 1)); // anti-aliasing depois do tone mapping
   composer.addPass(grade);
+
+  // Oclusão de ambiente N8AO (CDN, versão fixa) e bokeh: só no desktop, chegam depois do primeiro quadro
+  if (!mobile) {
+    import('n8ao').then(({ N8AOPass }) => {
+      const ao = new N8AOPass(desert.scene, desertCam, mixPass.w || 1, mixPass.h || 1);
+      Object.assign(ao.configuration, { aoSamples: 16, denoiseSamples: 8, denoiseRadius: 12, denoiseIterations: 2, halfRes: true, depthAwareUpsampling: true, gammaCorrection: false, transparencyAware: false });
+      mixPass.ao = ao;
+      mixPass.dof = new FullScreenQuad(new THREE.ShaderMaterial(DofShader));
+      mixPass.setSize(mixPass.w, mixPass.h);
+    }).catch((err) => console.warn('[MONÓLITO] N8AO indisponível', err));
+  }
 
   const s = { n: 1, t: 0, mx: 0, my: 0, journey: 0, gallery: 0, contact: 0, mode: 'journey', intro: 0, paused: false, hover: false, vel: 0 };
   const target = { journey: 0, gallery: 0, contact: 0, mx: 0, my: 0 };

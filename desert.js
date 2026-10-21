@@ -462,6 +462,7 @@ export function createDesert(renderer, { mobile }) {
     canDrag: (s) => (s.mode === 'contact' ? true : s.journey < 0.12),
     drag(dx) { dragging = true; rotV = dx * 0.0045; rot += rotV; },
     release() { dragging = false; },
+    ao: { radius: 1.2, intensity: 2.5 },
     bloom: { strength: 0.42, radius: 0.38, threshold: 1.0 },
   };
 }
