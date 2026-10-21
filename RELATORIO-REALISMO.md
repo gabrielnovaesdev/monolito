@@ -2,7 +2,7 @@
 
 ## Conclusão
 
-**Veredito: limite de melhora alcançado** (não "beirando a realidade"). Média final 7,1, contra ~5,5 estimado na versão anterior.
+**Veredito: limite de melhora alcançado** (não "beirando a realidade"). Média final 7,1 (6,8 ao fim da fase 1; a versão original não recebeu nota).
 O ciclo parou porque as iterações 2 e 3 subiram a média menos de 0,2 cada: o que falta pede recursos que não estão ao meu alcance aqui.
 
 Notas finais por cenário (L iluminação · M materiais · Mo modelos · V vida · C câmera):
