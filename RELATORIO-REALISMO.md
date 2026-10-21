@@ -128,3 +128,22 @@ Notas na saída: corredor 6,4 · Torre 6,6 · fenda 6,8 · Pavilhão 7,5 · dema
 FPS desktop (vsync desligado): hero 370 · corredor 302 · porta 204 · Duna 330/268 · Capela 284/285 · Pavilhão 246/232 · Torre 390/324 · fenda 154 · contato 355.
 Carregamento (mediana de 3): FCP 276 ms · LCP 4,2 s · TBT ≈ 1,15 s · CLS 0.
 Capturas: `relatorio/iter1/antes` e `relatorio/iter1/depois`.
+
+### Iteração 2
+
+Defeitos priorizados:
+1. Torre: a fachada parecia um código de barras (192 listras de 10 cm por lado) e o vidro não refletia nada; a cidade tinha janelas quadradas genéricas.
+2. Ao dar reflexo ao vidro, surgiu um ponto azul estourado: o especular da lua (luz direcional) num vidro liso demais. Também era preciso limitar os postes do HDRI noturno.
+3. Pavilhão: o piso `large_floor_tiles_02` deixava a praça cinza e suja, e os arcos ficavam cinza-concreto ou bege-esponja, conforme o tom.
+4. Casa Duna: a cor da areia variava entre perto (cinza) e longe (laranja).
+
+O que mudou:
+- Fachada da Torre redesenhada: vãos de 1,5 m com caixilho, luminária linear no forro, gradiente de luz, móveis em silhueta, persianas e vãos apagados; quatro variantes alternadas por andar. Vidro com reflexo do HDRI (rugosidade 0,16) e pico do HDRI limitado a 4× o horizonte.
+- Cidade: mesma lógica (vãos de 2,4 m × 3,5 m, luz quente ou fria, persianas), em escala real por instância.
+- Novo modo `tone` no `pbr()`: a cor do material define o albedo e a textura só entra como variação de luminância. Assim a praça vira pedra lioz clara com as juntas, os arcos ficam creme com estratos, e a areia da Duna tem a mesma cor perto e longe.
+
+Notas na saída: Torre 7,0 (L 7 · M 7 · Mo 6,5 · V 7 · C 7,5) · Pavilhão 8,0 (L 8,5 · M 8 · Mo 7 · V 8 · C 8,5) · Casa Duna 7,5. Demais iguais. **Média geral 7,1** (+0,1: ganho concentrado em 3 dos 11 cenários).
+
+FPS desktop: hero 370 · corredor 300 · porta 203 · Duna 338/266 · Capela 283/285 · Pavilhão 248/229 · Torre 336/328 · fenda 153 · contato 360.
+Carregamento: FCP 352 ms · LCP 4,3 s · TBT ≈ 1,2 s · CLS 0.
+Capturas: `relatorio/iter2/antes` e `relatorio/iter2/depois`.

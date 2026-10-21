@@ -96,8 +96,18 @@ const loadTex = (url) => { if (!texFiles.has(url)) texFiles.set(url, texLoader.l
 const pendingLoads = [];
 // Cargas pendentes criadas desde a última chamada (cada cenário recolhe as suas para esperar antes de compilar).
 export const takeLoads = () => pendingLoads.splice(0);
-export function pbr(name, { size = 2, normalScale = 1, aoIntensity = 1, normal = true, ...params } = {}) {
+// `tone`: a cor do material vira o albedo e a textura só entra como variação de luminância (contraste `tone`)
+export function pbr(name, { size = 2, normalScale = 1, aoIntensity = 1, normal = true, tone = 0, ...params } = {}) {
   const mat = new THREE.MeshStandardMaterial({ roughness: 1, ...params });
+  if (tone) {
+    mat.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+        #ifdef USE_MAP
+          diffuseColor.rgb = diffuse * clamp(1.0 + (dot(sampledDiffuseColor.rgb, vec3(0.333)) - ${(+tone.mean || 0.45).toFixed(3)}) * ${(+tone.k || tone).toFixed(3)}, 0.2, 1.6);
+        #endif`);
+    };
+    mat.customProgramCacheKey = () => 'tone' + JSON.stringify(tone);
+  }
   const base = `assets/tex/${name}_`;
   mat.userData.ready = Promise.all(['diff', 'nor_gl', 'arm'].map((k) => loadTex(`${base}${k}_1k.jpg`))).then(([d, n, a]) => {
     const [map, nor, arm] = [d, n, a].map((t) => {
@@ -139,15 +149,21 @@ function canvasTex(w, h, paint, srgb = false) {
   return t;
 }
 
-// Grade de janelas acesas aleatoriamente (para a cidade à noite).
-export function windowsTexture(cols = 8, rows = 16, lit = 0.35) {
-  return canvasTex(cols * 16, rows * 16, (g, w, h) => {
+// Fachadas da cidade à noite: `cols` vãos × `rows` andares, cada vão com caixilho, forro e brilho próprios.
+export function windowsTexture(cols = 8, rows = 16, lit = 0.4) {
+  const bw = 32, bh = 40;
+  return canvasTex(cols * bw, rows * bh, (g, w, h) => {
     g.fillStyle = '#0d0f14'; g.fillRect(0, 0, w, h);
     for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
-      const on = Math.random() < lit;
-      const warm = Math.random() < 0.7;
-      g.fillStyle = on ? (warm ? `rgba(255,${190 + Math.random() * 40},${120 + Math.random() * 40},1)` : 'rgba(190,215,255,1)') : 'rgba(40,46,58,1)';
-      g.fillRect(x * 16 + 3, y * 16 + 4, 10, 9);
+      const px = x * bw, py = y * bh, on = Math.random() < lit, warm = Math.random();
+      if (on) {
+        const cool = warm < 0.25;
+        const gr = g.createLinearGradient(0, py + 6, 0, py + bh - 4);
+        const c = cool ? [200, 222, 255] : [255, 196 + warm * 40, 130 + warm * 60];
+        gr.addColorStop(0, `rgba(${c[0]},${c[1] | 0},${c[2] | 0},1)`); gr.addColorStop(1, `rgba(${c[0]},${c[1] | 0},${c[2] | 0},.45)`);
+        g.fillStyle = gr; g.fillRect(px + 3, py + 6, bw - 6, bh - 10);
+        if (Math.random() < 0.3) { g.fillStyle = 'rgba(30,24,18,.5)'; for (let k = py + 8; k < py + bh - 4; k += 4) g.fillRect(px + 3, k, bw - 6, 1.5); }
+      } else { g.fillStyle = 'rgba(34,40,52,1)'; g.fillRect(px + 3, py + 6, bw - 6, bh - 10); }
     }
   }, true);
 }

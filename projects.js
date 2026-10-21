@@ -39,8 +39,8 @@ function rig(keys) {
 }
 
 // HDRI do cenário: ilumina por imagem e, quando `sky` é passado, vira o fundo (com a névoa na cor do horizonte).
-function hdri(renderer, scene, name, { mobile, sunDir, sky, bg = 1, env = 1, fog = 1 }) {
-  return loadHDR(renderer, name, { mobile, sunDir, background: !!sky }).then(({ env: e, background, horizon }) => {
+function hdri(renderer, scene, name, { mobile, sunDir, sky, bg = 1, env = 1, fog = 1, clamp }) {
+  return loadHDR(renderer, name, { mobile, sunDir, clamp, background: !!sky }).then(({ env: e, background, horizon }) => {
     scene.environment?.dispose();
     scene.environment = e;
     scene.userData.envK = env;
@@ -109,7 +109,7 @@ export function casaDuna(renderer, { mobile }) {
   uvScale(gg, 500);
   const sn = sandNormal(256); sn.repeat.setScalar(0.32);
   // Grão e cor da areia (PBR) com as ondulações de vento procedurais por cima
-  const sandMat = pbr('dense_sand', { size: 1.8, normal: false, color: '#f9b885', roughness: 1 });
+  const sandMat = pbr('dense_sand', { size: 1.8, normal: false, color: '#c99a70', tone: 0.9, roughness: 1 });
   sandMat.normalMap = sn; sandMat.normalScale.set(0.3, 0.3);
   const ground = new THREE.Mesh(gg, sandMat);
   ground.receiveShadow = true;
@@ -363,7 +363,7 @@ export function pavilhaoArco(renderer, { mobile }) {
   scene.add(new THREE.HemisphereLight('#cfe0f2', '#d9cfbf', 0.75));
 
   // Praça de pedra clara com juntas (PBR)
-  const plaza = new THREE.Mesh(uvScale(new THREE.PlaneGeometry(120, 120), 120), pbr('large_floor_tiles_02', { size: 3, color: '#fff6e6' }));
+  const plaza = new THREE.Mesh(uvScale(new THREE.PlaneGeometry(120, 120), 120), pbr('large_floor_tiles_02', { size: 3, color: '#cfc6b6', tone: 1.1 }) /* pedra lioz clara */);
   plaza.rotation.x = -Math.PI / 2; plaza.receiveShadow = true; scene.add(plaza);
 
   const pool = waterMaterial('#6d8893', 4);
@@ -379,7 +379,7 @@ export function pavilhaoArco(renderer, { mobile }) {
   box(scene, 120, 0.7, 1.2, edge, 0, -0.25, -60.6);
 
   // Sete arcos em escala real (7 m de vão, 9 m de altura)
-  const trav = pbr('concrete_layers_02', { size: 2.4, color: '#ffe4c0', normalScale: 0.6, aoIntensity: 0.7 }); // estratos horizontais claros, como travertino
+  const trav = pbr('concrete_layers_02', { size: 2.4, color: '#d9c7ad', tone: 1.0, normalScale: 0.6, aoIntensity: 0.7 }); // estratos horizontais claros, como travertino
   const ag = archGeo(7.4, 5.6, 0.95, 1.3);
   for (let i = 0; i < 7; i++) {
     const a = new THREE.Mesh(ag, trav);
@@ -461,18 +461,34 @@ export function torreEstrato(renderer, { mobile }) {
   const tower = new THREE.Group();
   scene.add(tower);
   const slabMat = pbr('concrete_layers_02', { size: 2, color: '#c9c1b5' });
-  // Montantes verticais: o andar aceso vira uma fileira de janelas, não um bloco de luz
-  const mull = (() => {
-    const c = document.createElement('canvas'); c.width = 256; c.height = 32;
+  // Fachada de um andar: 8 vãos de 1,5 m por repetição, cada um com caixilho, forro iluminado,
+  // ambiente com móveis em silhueta, persianas ou luz apagada. Quatro variantes para não repetir.
+  const facade = () => {
+    const c = document.createElement('canvas'); c.width = 512; c.height = 128;
     const g = c.getContext('2d');
-    for (let x = 0; x < 64; x++) {
-      const on = Math.random() < 0.78;
-      g.fillStyle = on ? `rgba(255,${200 + Math.random() * 40},${140 + Math.random() * 40},1)` : '#1a1c22';
-      g.fillRect(x * 4, 2, 3, 28);
+    g.fillStyle = '#0c0d10'; g.fillRect(0, 0, 512, 128);
+    for (let b = 0; b < 8; b++) {
+      const x = b * 64, r = Math.random(), warm = Math.random();
+      const lit = r < 0.72, blind = r > 0.55 && r < 0.72;
+      const col = (k) => `rgba(255,${Math.round(196 + warm * 40)},${Math.round(130 + warm * 70)},${k})`;
+      if (lit) {
+        const gr = g.createLinearGradient(0, 8, 0, 124);
+        gr.addColorStop(0, col(1)); gr.addColorStop(0.18, col(0.85)); gr.addColorStop(1, col(0.35 + Math.random() * 0.2));
+        g.fillStyle = gr; g.fillRect(x + 3, 8, 58, 116);
+        g.fillStyle = 'rgba(255,250,235,1)'; g.fillRect(x + 6, 9, 52, 3); // luminária linear no forro
+        g.fillStyle = 'rgba(20,16,12,.75)';
+        for (let k = 0; k < 2; k++) { const w = 10 + Math.random() * 18; g.fillRect(x + 6 + Math.random() * (52 - w), 86 + Math.random() * 12, w, 38); } // móveis
+        if (blind) { g.fillStyle = 'rgba(40,32,24,.45)'; for (let y = 10; y < 124; y += 5) g.fillRect(x + 3, y, 58, 2); }
+      } else {
+        g.fillStyle = 'rgba(24,28,36,1)'; g.fillRect(x + 3, 8, 58, 116);
+      }
+      g.fillStyle = '#08090b'; g.fillRect(x, 0, 3, 128); g.fillRect(x + 61, 0, 3, 128); // montantes
     }
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.repeat.set(3, 1);
+    g.fillStyle = '#08090b'; g.fillRect(0, 0, 512, 8); g.fillRect(0, 124, 512, 4); // travessas
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.repeat.set(19 / 12, 1); t.anisotropy = 8;
     return t;
-  })();
+  };
+  const facades = Array.from({ length: 4 }, facade);
   const slabGeo = new THREE.BoxGeometry(24, 0.55, 24);
   const glassGeo = new THREE.BoxGeometry(19, FH - 0.6, 19);
   const floors = [];
@@ -480,7 +496,8 @@ export function torreEstrato(renderer, { mobile }) {
     const rot = i * 0.045;
     const slab = new THREE.Mesh(slabGeo, slabMat);
     slab.position.y = i * FH; slab.rotation.y = rot; tower.add(slab);
-    const m = new THREE.MeshStandardMaterial({ color: '#141820', roughness: 0.15, metalness: 0.6, emissive: '#ffffff', emissiveMap: mull, emissiveIntensity: 0 });
+    // Vidro: reflete o HDRI noturno (envMapIntensity alto porque a cena inteira usa 0,02 desse HDRI)
+    const m = new THREE.MeshStandardMaterial({ color: '#141820', roughness: 0.16, metalness: 0.7, emissive: '#ffffff', emissiveMap: facades[i % 4], emissiveIntensity: 0, envMapIntensity: 9 });
     const g = new THREE.Mesh(glassGeo, m);
     g.position.y = i * FH + FH / 2; g.rotation.y = rot; tower.add(g);
     floors.push({ m, phase: Math.random() * 100, base: Math.random() < 0.7 ? 0.35 + Math.random() * 0.6 : 0.03 });
@@ -493,13 +510,13 @@ export function torreEstrato(renderer, { mobile }) {
   });
 
   // Cidade: blocos instanciados com janelas acesas
-  const wt = windowsTexture(8, 20, 0.4);
+  const wt = windowsTexture(8, 16, 0.42);
   const cityMat = new THREE.MeshStandardMaterial({ color: '#15171d', roughness: 0.7, emissive: '#ffffff', emissiveMap: wt, emissiveIntensity: 0.85, map: wt });
-  // Janelas em escala real: cada repetição da textura = 8 colunas × 3,2 m e 20 andares × 3,5 m, seja qual for o prédio
+  // Janelas em escala real: cada repetição da textura = 8 vãos × 2,4 m e 16 andares × 3,5 m, seja qual for o prédio
   cityMat.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader.replace('#include <uv_vertex>', `#include <uv_vertex>
       vec3 isz = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
-      vec2 rep = vec2((abs(normal.x) > 0.5 ? isz.z : isz.x) / 25.6, isz.y / 70.0);
+      vec2 rep = vec2((abs(normal.x) > 0.5 ? isz.z : isz.x) / 19.2, isz.y / 56.0);
       vMapUv *= rep; vEmissiveMapUv *= rep;`);
   };
   // Telhados sem janelas: laje escura com um pouco de reflexo do céu
@@ -533,7 +550,7 @@ export function torreEstrato(renderer, { mobile }) {
   const street = new THREE.PointLight('#ffb070', 400, 90, 1.6);
   street.position.set(0, 6, 40); scene.add(street);
 
-  const hdr = hdri(renderer, scene, 'modern_buildings_night', { mobile, env: 0.02 });
+  const hdr = hdri(renderer, scene, 'modern_buildings_night', { mobile, env: 0.02, clamp: 4 }); // postes do HDRI não viram faíscas no vidro
 
   const cam = rig([
     { u: 0, pos: [62, 3, 128], look: [0, 42, 0] },
