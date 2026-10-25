@@ -267,8 +267,13 @@ export function createEngine(canvas, { onHover, onIndex, onContextLost } = {}) {
     else if (cam !== desertCam) cam.clearViewOffset();
     cam.updateProjectionMatrix();
   }
+  // Tamanho real do canvas. Se a página nasce com tamanho zero (aba em segundo plano, iframe de
+  // pré-visualização, link aberto de outro app), nada é criado em 0×0: o laço reajusta quando houver tamanho.
+  let sizeW = 0, sizeH = 0;
   function resize() {
-    const w = innerWidth, h = innerHeight;
+    const w = canvas.clientWidth || innerWidth, h = canvas.clientHeight || innerHeight;
+    if (!w || !h) return;
+    sizeW = w; sizeH = h;
     renderer.setSize(w, h, false);
     composer.setSize(w, h);
     bloom.setSize(Math.round(w / 2), Math.round(h / 2));
@@ -284,6 +289,9 @@ export function createEngine(canvas, { onHover, onIndex, onContextLost } = {}) {
   function frame(now) {
     raf = 0;
     if (s.mode === 'off') return;
+    const cw = canvas.clientWidth, ch = canvas.clientHeight;
+    if (cw && ch && (cw !== sizeW || ch !== sizeH)) resize(); // corrige tamanho perdido sem depender do evento
+    if (!sizeW) { raf = requestAnimationFrame(frame); return; } // ainda sem tamanho: não renderiza em 0×0
     const dt = Math.max(1, Math.min(64, now - last));
     last = now;
     s.n = dt / 16.67;
@@ -337,7 +345,7 @@ export function createEngine(canvas, { onHover, onIndex, onContextLost } = {}) {
   }
 
   renderer.compile(desert.scene, desertCam);
-  composer.render();
+  if (sizeW) composer.render();
   raf = requestAnimationFrame(frame);
 
   return {
