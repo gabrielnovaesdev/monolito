@@ -20,7 +20,8 @@
   <script>
     document.documentElement.classList.add('js');
     // Trava final: mesmo se algo falhar, a página nunca fica presa no loader.
-    setTimeout(function () { var d = document.documentElement; if (!d.classList.contains('is-ready')) { d.classList.add('is-ready', 'is-fallback'); var l = document.querySelector('.loader'); if (l) l.remove(); } }, 10000);
+    // Só revela o conteúdo; não desliga o 3D (em conexão lenta ele chega depois e entra normalmente).
+    setTimeout(function () { var d = document.documentElement; if (!d.classList.contains('is-ready')) { d.classList.add('is-ready'); var l = document.querySelector('.loader'); if (l) l.remove(); } }, 15000);
   </script>
 </head>
 <body>

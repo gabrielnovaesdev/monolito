@@ -46,6 +46,12 @@ const cursor = { el: $('.cursor'), label: $('.cursor__label') };
 const sceneReady = import('./engine.js')
   .then(({ createEngine }) => {
     engine = createEngine($('.scene'), { onHover: setGrab, onIndex: setWork, onContextLost: toFallback });
+    // O 3D pode chegar depois da entrada (conexão lenta): assume o estado atual da página
+    if (root.classList.contains('is-ready')) {
+      engine.setIntro(intro.v);
+      if (built) ScrollTrigger?.refresh();
+      if (intro.v >= 1) engine.preload();
+    }
     if (reduced) { engine.setPaused(true); engine.setIntro(1); }
   })
   .catch((err) => {
@@ -54,7 +60,10 @@ const sceneReady = import('./engine.js')
   })
   .finally(() => { parts.scene = 1; });
 
+let failed = false, built = false;
+const intro = { v: 0 };
 function toFallback() {
+  failed = true;
   root.classList.add('is-fallback');
   $('.scene')?.remove();
   $$('[data-count]').forEach((el) => (el.textContent = el.dataset.count));
@@ -83,6 +92,7 @@ function runLoader() {
     const el = now - t0;
     const floor = Math.min(92, 88 * (1 - Math.exp(-el / 2200)));
     shown += (Math.max(target(), floor) - shown) * 0.1;
+    if (!loader.isConnected) return finish();
     pct.textContent = `${Math.round(shown)} %`;
     bar.style.setProperty('--p', shown / 100);
     seam.style.transform = `scaleY(${shown / 100})`;
@@ -98,16 +108,16 @@ function runLoader() {
     seam.style.transform = 'scaleY(1)';
     root.classList.add('is-ready');
     safeBuild();
-    const intro = { v: 0 };
+    const curtain = loader && loader.isConnected ? loader : null; // a trava do <head> pode já ter removido
     gsap.timeline({ delay: 0.2 })
       // A cortina abre pela fenda do monólito: um recorte vertical que se alarga
-      .to(loader, { clipPath: 'inset(0% 50% 0% 50%)', duration: 1.3, ease: E.inout, onComplete: () => loader.remove() })
+      .add(() => curtain && gsap.to(curtain, { clipPath: 'inset(0% 50% 0% 50%)', duration: 1.3, ease: E.inout, onComplete: () => curtain.remove() }), 0)
       .to(intro, { v: 1, duration: 3.6, ease: E.soft, onUpdate: () => engine?.setIntro(intro.v) }, 0.1)
       .from('.hero__title .ln > span', { yPercent: 115, duration: 1.6, stagger: 0.12, ease: E.out }, 1.4)
       .from('.hero__meta > *, .hero__lede, .hero__cue, .nav > *, .hud > *', { opacity: 0, y: 12, filter: 'blur(6px)', duration: 1.2, stagger: 0.06, ease: E.out, clearProps: 'filter' }, 1.8)
       .add(() => lenis?.start(), 1.6)
       .add(() => engine?.preload(), 3.8);
-    gsap.set(loader, { clipPath: 'inset(0% 0% 0% 0%)' });
+    if (curtain) gsap.set(curtain, { clipPath: 'inset(0% 0% 0% 0%)' });
   }
 }
 
@@ -126,7 +136,8 @@ function build() {
   setupMagnetic();
   workEls = $$('.work');
   workEls.forEach((w) => $$('.ln', w).forEach((ln, i) => ln.style.setProperty('--i', i)));
-  if (!gsap || !ScrollTrigger || root.classList.contains('is-fallback')) { toFallback(); return; }
+  if (!gsap || !ScrollTrigger || failed) { toFallback(); return; }
+  built = true;
 
   const journey = $('.journey'), gal = $('.gallery'), studio = $('.studio'), contact = $('.contact');
   const hud = $('.hud'), chapters = $$('.hud__chapters li'), drag = $('.hud__drag'), gprog = $('.gprog');
